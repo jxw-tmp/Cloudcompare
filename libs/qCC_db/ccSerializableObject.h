@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -26,7 +26,6 @@
 #include <CCTypes.h>
 
 //System
-#include <stdio.h>
 #include <stdint.h>
 
 //Qt
@@ -213,8 +212,18 @@ public:
 			//array data (dataVersion>=20)
 			{
 #ifdef CC_ENV_64
-				if (in.read((char*)chunkArray.data(),sizeof(ElementType)*N*chunkArray.currentSize()) < 0)
-					return ccSerializableObject::ReadError();
+				//Apparently Qt and/or Windows don't like to read too many bytes in a row...
+				static const qint64 MaxElementPerChunk = (static_cast<qint64>(1) << 24);
+				qint64 byteCount = static_cast<qint64>(sizeof(ElementType)*N) * chunkArray.currentSize();
+				char* dest = (char*)chunkArray.data();
+				while (byteCount > 0)
+				{
+					qint64 chunkSize = std::min(MaxElementPerChunk, byteCount);
+					if (in.read(dest, chunkSize) < 0)
+						return ccSerializableObject::ReadError();
+					byteCount -= chunkSize;
+					dest += chunkSize;
+				}
 #else
 				//--> we read each chunk as a block (faster)
 				unsigned chunksCount = chunkArray.chunksCount();

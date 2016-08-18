@@ -20,7 +20,6 @@ public:
 		\param bitrate bit rate (e.g. 400 000)
 		\param gop keyframe interval
 		\param fps frame rate
-		\return success
 	**/
 	QVideoEncoder(	QString filename,
 					unsigned width,
@@ -42,7 +41,7 @@ public:
 	inline bool isOpen() const { return m_isOpen; }
 
 	//! Adds an image to the stream
-	virtual bool encodeImage(const QImage& image, QString* errorString = 0);
+	virtual bool encodeImage(const QImage& image, int frameIndex, QString* errorString = 0);
 
 	//! Closes the file
 	virtual bool close();

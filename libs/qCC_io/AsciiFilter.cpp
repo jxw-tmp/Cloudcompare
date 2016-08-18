@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -28,7 +28,6 @@
 
 //qCC_db
 #include <ccPointCloud.h>
-#include <ccHObject.h>
 #include <ccProgressDialog.h>
 #include <ccLog.h>
 #include <ccScalarField.h>
@@ -38,23 +37,27 @@
 #include <assert.h>
 
 //declaration of static members
-QSharedPointer<AsciiSaveDlg> AsciiFilter::s_saveDialog(0);
-QSharedPointer<AsciiOpenDlg> AsciiFilter::s_openDialog(0);
+AutoDeletePtr<AsciiSaveDlg> AsciiFilter::s_saveDialog(0);
+AutoDeletePtr<AsciiOpenDlg> AsciiFilter::s_openDialog(0);
 
-QSharedPointer<AsciiSaveDlg> AsciiFilter::GetSaveDialog()
+AsciiSaveDlg* AsciiFilter::GetSaveDialog(QWidget* parentWidget/*=0*/)
 {
-	if (!s_saveDialog)
-		s_saveDialog = QSharedPointer<AsciiSaveDlg>(new AsciiSaveDlg());
+	if (!s_saveDialog.ptr)
+	{
+		s_saveDialog.ptr = new AsciiSaveDlg(parentWidget);
+	}
 
-	return s_saveDialog;
+	return s_saveDialog.ptr;
 }
 
-QSharedPointer<AsciiOpenDlg> AsciiFilter::GetOpenDialog()
+AsciiOpenDlg* AsciiFilter::GetOpenDialog(QWidget* parentWidget/*=0*/)
 {
-	if (!s_openDialog)
-		s_openDialog = QSharedPointer<AsciiOpenDlg>(new AsciiOpenDlg());
+	if (!s_openDialog.ptr)
+	{
+		s_openDialog.ptr = new AsciiOpenDlg(parentWidget);
+	}
 
-	return s_openDialog;
+	return s_openDialog.ptr;
 }
 
 bool AsciiFilter::canLoadExtension(QString upperCaseExt) const
@@ -84,10 +87,14 @@ CC_FILE_ERROR AsciiFilter::saveToFile(ccHObject* entity, QString filename, SaveP
 {
 	assert(entity && !filename.isEmpty());
 
-	QSharedPointer<AsciiSaveDlg> saveDialog = GetSaveDialog();
+	AsciiSaveDlg* saveDialog = GetSaveDialog(parameters.parentWidget);
+	assert(saveDialog);
+
 	//if the dialog shouldn't be shown, we'll simply take the default values!
 	if (parameters.alwaysDisplaySaveDialog && saveDialog->autoShow() && !saveDialog->exec())
+	{
 		return CC_FERR_CANCELED_BY_USER;
+	}
 
 	if (!entity->isKindOf(CC_TYPES::POINT_CLOUD))
 	{
@@ -115,7 +122,9 @@ CC_FILE_ERROR AsciiFilter::saveToFile(ccHObject* entity, QString filename, SaveP
 			{
 				unsigned counter = 0;
 				//disable the save dialog so that it doesn't appear again!
-				QSharedPointer<AsciiSaveDlg> saveDialog = GetSaveDialog();
+				AsciiSaveDlg* saveDialog = GetSaveDialog();
+				assert(saveDialog);
+
 				bool autoShow = saveDialog->autoShow();
 				saveDialog->setAutoShow(false);
 
@@ -180,10 +189,10 @@ CC_FILE_ERROR AsciiFilter::saveToFile(ccHObject* entity, QString filename, SaveP
 	bool writeSF = (theScalarFields.size() != 0);
 
 	//progress dialog
-	ccProgressDialog pdlg(true);
-	CCLib::NormalizedProgress nprogress(&pdlg,numberOfPoints);
-	pdlg.setMethodTitle(qPrintable(QString("Saving cloud [%1]").arg(cloud->getName())));
-	pdlg.setInfo(qPrintable(QString("Number of points: %1").arg(numberOfPoints)));
+	ccProgressDialog pdlg(true, parameters.parentWidget);
+	CCLib::NormalizedProgress nprogress(&pdlg, numberOfPoints);
+	pdlg.setMethodTitle(QObject::tr("Saving cloud [%1]").arg(cloud->getName()));
+	pdlg.setInfo(QObject::tr("Number of points: %1").arg(numberOfPoints));
 	pdlg.start();
 
 	//output precision
@@ -354,9 +363,7 @@ CC_FILE_ERROR AsciiFilter::loadFile(QString filename,
 	//column attribution dialog
 	//DGM: we ask for the semi-persistent dialog as it may have
 	//been already initialized (by the command-line for instance)
-	QSharedPointer<AsciiOpenDlg> openDialog = GetOpenDialog();
-	s_openDialog.clear(); //release the 'source' dialog (so as to be sure to reset it next time)
-	
+	AsciiOpenDlg* openDialog = GetOpenDialog(parameters.parentWidget);
 	assert(openDialog);
 	openDialog->setFilename(filename);
 
@@ -377,8 +384,14 @@ CC_FILE_ERROR AsciiFilter::loadFile(QString filename,
 	if (	forceDialogDisplay
 		||	!AsciiOpenDlg::CheckOpenSequence(openDialog->getOpenSequence(),dummyStr) )
 	{
+		//show the dialog
 		if (!openDialog->exec())
+		{
+			s_openDialog.release(); //release the 'source' dialog (so as to be sure to reset it next time)
+
+			//process was cancelled
 			return CC_FERR_CANCELED_BY_USER;
+		}
 	}
 
 	//we compute the approximate line number
@@ -389,6 +402,8 @@ CC_FILE_ERROR AsciiFilter::loadFile(QString filename,
 	char separator = static_cast<char>(openDialog->getSeparator());
 	unsigned maxCloudSize = openDialog->getMaxCloudSize();
 	unsigned skipLineCount = openDialog->getSkippedLinesCount();
+
+	s_openDialog.release(); //release the 'source' dialog (so as to be sure to reset it next time)
 
 	return loadCloudFromFormatedAsciiFile(	filename,
 											container,
@@ -444,7 +459,7 @@ struct cloudAttributesDescriptor
 		
 		scalarIndexes.clear();
 		scalarFields.clear();
-	};
+	}
 
 	void updateMaxIndex(int& maxIndex)
 	{
@@ -455,7 +470,7 @@ struct cloudAttributesDescriptor
 		for (size_t j=0; j<scalarIndexes.size(); ++j)
 			if (scalarIndexes[j] > maxIndex)
 				maxIndex = scalarIndexes[j];
-	};
+	}
 
 };
 
@@ -694,10 +709,10 @@ CC_FILE_ERROR AsciiFilter::loadCloudFromFormatedAsciiFile(	const QString& filena
 	}
 
 	//progress indicator
-	ccProgressDialog pdlg(true);
-	CCLib::NormalizedProgress nprogress(&pdlg,approximateNumberOfLines);
-	pdlg.setMethodTitle(qPrintable(QString("Open ASCII file [%1]").arg(filename)));
-	pdlg.setInfo(qPrintable(QString("Approximate number of points: %1").arg(approximateNumberOfLines)));
+	ccProgressDialog pdlg(true, parameters.parentWidget);
+	CCLib::NormalizedProgress nprogress(&pdlg, approximateNumberOfLines);
+	pdlg.setMethodTitle(QObject::tr("Open ASCII file [%1]").arg(filename));
+	pdlg.setInfo(QObject::tr("Approximate number of points: %1").arg(approximateNumberOfLines));
 	pdlg.start();
 
 	//buffers
@@ -798,7 +813,7 @@ CC_FILE_ERROR AsciiFilter::loadCloudFromFormatedAsciiFile(	const QString& filena
 
 			//we update the progress info
 			nprogress.scale(approximateNumberOfLines,100,true);
-			pdlg.setInfo(qPrintable(QString("Approximate number of points: %1").arg(approximateNumberOfLines)));
+			pdlg.setInfo(QObject::tr("Approximate number of points: %1").arg(approximateNumberOfLines));
 
 			nextLimit = cloudChunkPos+cloudChunkSize;
 		}

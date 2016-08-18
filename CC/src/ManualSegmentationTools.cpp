@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -210,15 +211,17 @@ GenericIndexedMesh* ManualSegmentationTools::segmentMesh(GenericIndexedMesh* the
 		unsigned numberOfTriangles = theMesh->size();
 
 		//progress notification
-		NormalizedProgress* nprogress = 0;
+		NormalizedProgress nprogress(progressCb, numberOfTriangles);
 		if (progressCb)
 		{
-			progressCb->reset();
-			progressCb->setMethodTitle("Extract mesh");
-			char buffer[256];
-			sprintf(buffer,"New vertex number: %u",numberOfIndexes);
-			nprogress = new NormalizedProgress(progressCb,numberOfTriangles);
-			progressCb->setInfo(buffer);
+			if (progressCb->textCanBeEdited())
+			{
+				progressCb->setMethodTitle("Extract mesh");
+				char buffer[256];
+				sprintf(buffer, "New vertex number: %u", numberOfIndexes);
+				progressCb->setInfo(buffer);
+			}
+			progressCb->update(0);
 			progressCb->start();
 		}
 
@@ -264,17 +267,11 @@ GenericIndexedMesh* ManualSegmentationTools::segmentMesh(GenericIndexedMesh* the
 										indexShift + newVertexIndexes[2] );
 			}
 
-			if (nprogress && !nprogress->oneStep())
+			if (progressCb && !nprogress.oneStep())
 			{
 				//cancel process
 				break;
 			}
-		}
-
-		if (nprogress)
-		{
-			delete nprogress;
-			nprogress = 0;
 		}
 
 		if (newMesh)

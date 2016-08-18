@@ -1,5 +1,10 @@
 <RCC>
   <qresource prefix="/CC">
+    <file>images/restore.png</file>
+    <file>images/square.png</file>
+    <file>images/interactors.png</file>
+    <file>images/oculus.png</file>
+    <file>images/nvidia.png</file>
     <file>images/ccSwapUpDown.png</file>
     <file>images/unfoldSmall.png</file>
     <file>images/ccStereo.png</file>
@@ -125,6 +130,7 @@
     <file>images/typeXCoordinate.png</file>
     <file>images/typeYCoordinate.png</file>
     <file>images/typeZCoordinate.png</file>
+    <file>images/ccTracePolyline.png</file>
   </qresource>
   <qresource prefix="/CC/Icons">
     <file>images/icon/cc_viewer_icon_16.png</file>

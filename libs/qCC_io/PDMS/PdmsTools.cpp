@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -22,7 +22,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <assert.h>
-#include <set>
+#include <unordered_set>
 
 //qCC_db
 //#include <ccLog.h>
@@ -46,7 +46,7 @@ static GroupElement defaultWorld(PDMS_WORLD);
 ///////////////////////////////
 // ITEM STACK
 ///////////////////////////////
-typedef std::set<PdmsObjects::GenericItem*> ElementsStack;
+typedef std::unordered_set<PdmsObjects::GenericItem*> ElementsStack;
 ElementsStack s_elementsStack;
 
 void PdmsObjects::Stack::Init()
@@ -740,6 +740,9 @@ const char* ElementCreation::GetDefaultElementName(Token token)
 		return "Loop";
 	case PDMS_VERTEX:
 		return "Vertex";
+		
+	default:
+		break;
 	}
 
 	return 0;

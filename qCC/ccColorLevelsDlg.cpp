@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -39,14 +39,12 @@ static int s_outputLevels[2] = {0,255};
 static bool s_outputLevelsEnabled = false;
 
 ccColorLevelsDlg::ccColorLevelsDlg(QWidget* parent, ccGenericPointCloud* pointCloud)
-	: QDialog(parent)
+	: QDialog(parent, Qt::Tool)
 	, Ui::ColorLevelsDialog()
 	, m_histogram(0)
 	, m_cloud(pointCloud)
 {
 	setupUi(this);
-
-	setWindowFlags(Qt::Tool/*Qt::Dialog | Qt::WindowStaysOnTopHint*/);
 
 	//connect GUI elements
 	connect(channelComboBox,							SIGNAL(currentIndexChanged(int)),	this,	SLOT(onChannelChanged(int)));

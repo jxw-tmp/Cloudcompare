@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -20,24 +20,18 @@
 
 //Qt
 #include <QAbstractItemModel>
-#include <QItemSelection>
 #include <QPoint>
 #include <QTreeView>
 
-//CCLib
-#include <CCConst.h>
-
 //qCC_db
-#include <ccObject.h>
 #include <ccHObject.h>
-#include <ccDrawableObject.h>
 
 //System
-#include <string.h>
-#include <set>
+#include <unordered_set>
 
-class QStandardItemModel;
 class QAction;
+class QStandardItemModel;
+
 class ccPropertiesTreeDelegate;
 class ccHObject;
 
@@ -133,14 +127,6 @@ public:
 	//! Expands tree at a given node
 	void expandElement(ccHObject* object, bool state);
 
-	//! Selects a given entity
-	/** If ctrl is pressed by the user at the same time,
-		previous selection will be simply updated accordingly.
-		\param obj entity to select
-		\param forceAdditiveSelection whether to force additive selection (just as if CTRL key is pressed) or not
-	**/
-	void selectEntity(ccHObject* obj, bool forceAdditiveSelection = false);
-
 	//! Unselects a given entity
 	void unselectEntity(ccHObject* obj);
 
@@ -162,9 +148,7 @@ public:
 	virtual Qt::DropActions supportedDropActions() const;
 	virtual bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent);
 	virtual QMap<int,QVariant> itemData(const QModelIndex& index) const;
-#ifdef CC_QT5
 	virtual Qt::DropActions supportedDragActions() const { return Qt::MoveAction; }
-#endif
 
 public slots:
 	void changeSelection(const QItemSelection & selected, const QItemSelection & deselected);
@@ -174,13 +158,18 @@ public slots:
 	void updateCCObject(ccHObject* object);
 	void deleteSelectedEntities();
 
-	//! Shortcut to selectEntity(ccHObject*)
-	void selectEntity(int uniqueID);
+	//! Selects a given entity
+	/** If ctrl is pressed by the user at the same time,
+		previous selection will be simply updated accordingly.
+		\param obj entity to select
+		\param forceAdditiveSelection whether to force additive selection (just as if CTRL key is pressed) or not
+	**/
+	void selectEntity(ccHObject* obj, bool forceAdditiveSelection = false);
 
 	//! Selects multiple entities at once (shortcut to the other version)
 	/** \param entIDs list of the IDs of the entities to select
 	**/
-	void selectEntities(std::set<int> entIDs);
+	void selectEntities(std::unordered_set<int> entIDs);
 
 	//! Selects multiple entities at once
 	/** \param entities set of the entities to 'select'
@@ -249,7 +238,10 @@ protected:
 	void expandOrCollapseHoveredBranch(bool expand);
 
 	//! Selects objects by type and/or name
-	void selectChildrenByTypeAndName(CC_CLASS_ENUM type, bool typeIsExclusive = true, QString name = QString());
+    void selectChildrenByTypeAndName(CC_CLASS_ENUM type,
+                                     bool typeIsExclusive = true,
+                                     QString name = QString(),
+                                     bool nameIsRegex = false);
 
 	//! Associated DB root
 	ccHObject* m_treeRoot;

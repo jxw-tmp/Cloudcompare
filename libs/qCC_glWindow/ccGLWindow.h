@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -18,12 +18,7 @@
 #ifndef CC_GL_WINDOW_HEADER
 #define CC_GL_WINDOW_HEADER
 
-//CCLib
-#include <CCGeom.h>
-
 //qCC_db
-#include <ccIncludeGL.h>
-#include <ccGLMatrix.h>
 #include <ccDrawableObject.h>
 #include <ccGenericGLDisplay.h>
 #include <ccGLUtils.h>
@@ -32,24 +27,21 @@
 #include "ccGuiParameters.h"
 
 //Qt
-#include <QGLWidget>
-#include <QFont>
-#include <QMap>
 #include <QElapsedTimer>
 #include <QTimer>
-//#define THREADED_GL_WIDGET
-#ifdef THREADED_GL_WIDGET
-#include <QThread>
-#include <QMutex>
-#include <QWaitCondition>
-#include <QAtomicInt>
+#include <QByteArray>
+#include <QOpenGLDebugLogger>
+#include <QOpenGLExtensions>
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+#include <QWindow>
+#include <QWidget>
+#else
+#include <QOpenGLWidget>
 #endif
-//system
-#include <set>
-#include <list>
 
-//! OpenGL picking buffer size (= max hits number per 'OpenGL' selection pass)
-#define CC_PICKING_BUFFER_SIZE 65536
+//system
+#include <unordered_set>
+#include <list>
 
 class ccHObject;
 class ccBBox;
@@ -60,8 +52,16 @@ class ccFrameBufferObject;
 class ccInteractor;
 class ccPolyline;
 
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+class QOpenGLPaintDevice;
+typedef QWindow ccGLWindowParent;
+#else
+typedef QOpenGLWidget ccGLWindowParent;
+#endif
+
+
 //! OpenGL 3D view
-class ccGLWindow : public QGLWidget, public ccGenericGLDisplay
+class ccGLWindow : public ccGLWindowParent, public ccGenericGLDisplay
 {
 	Q_OBJECT
 
@@ -79,12 +79,35 @@ public:
 						DEFAULT_PICKING,
 	};
 
-	//! Interaction mode (with the mouse!)
-	enum INTERACTION_MODE { TRANSFORM_CAMERA,
-							TRANSFORM_ENTITY,
-							SEGMENT_ENTITY,
-							PAN_ONLY,
+	//! Interaction flags (mostly with the mouse)
+	enum INTERACTION_FLAG {
+
+		//no interaction
+		INTERACT_NONE = 0,
+
+		//camera interactions
+		INTERACT_ROTATE          =  1,
+		INTERACT_PAN             =  2,
+		INTERACT_ZOOM_CAMERA     =  4,
+		INTERACT_2D_ITEMS        =  8, //labels, etc.
+		INTERACT_CLICKABLE_ITEMS = 16, //hot zone
+
+		//options / modifiers
+		INTERACT_TRANSFORM_ENTITIES = 64,
+		
+		//signals
+		INTERACT_SIG_RB_CLICKED  = 128,      //right button clicked
+		INTERACT_SIG_LB_CLICKED  = 256,      //left button clicked
+		INTERACT_SIG_MOUSE_MOVED = 512,      //mouse moved (only if a button is clicked)
+		INTERACT_SIG_BUTTON_RELEASED = 1024, //mouse button released
+		INTERACT_SEND_ALL_SIGNALS = INTERACT_SIG_RB_CLICKED | INTERACT_SIG_LB_CLICKED | INTERACT_SIG_MOUSE_MOVED | INTERACT_SIG_BUTTON_RELEASED,
 	};
+	Q_DECLARE_FLAGS(INTERACTION_FLAGS, INTERACTION_FLAG)
+
+	//Default interaction modes (with the mouse!)
+	static INTERACTION_FLAGS PAN_ONLY();
+	static INTERACTION_FLAGS TRANSFORM_CAMERA();
+	static INTERACTION_FLAGS TRANSFORM_ENTITIES();
 
 	//! Default message positions on screen
 	enum MessagePosition {  LOWER_LEFT_MESSAGE,
@@ -101,6 +124,7 @@ public:
 						MANUAL_TRANSFORMATION_MESSAGE,
 						MANUAL_SEGMENTATION_MESSAGE,
 						ROTAION_LOCK_MESSAGE,
+						FULL_SCREEN_MESSAGE,
 	};
 
 	//! Pivot symbol visibility
@@ -110,13 +134,26 @@ public:
 	};
 
 	//! Default constructor
-	ccGLWindow(	QWidget *parent = 0,
-				const QGLFormat& format = QGLFormat::defaultFormat(),
-				QGLWidget* shareWidget = 0,
-				bool silentInitialization = false);
-	
+	ccGLWindow(QSurfaceFormat* format = 0, ccGLWindowParent* parent = 0, bool silentInitialization = false);
+
 	//! Destructor
 	virtual ~ccGLWindow();
+
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+	//! Returns the parent widget
+	QWidget* parentWidget() const { return m_parentWidget; }
+
+	//! Sets 'parent' widget
+	void setParentWidget(QWidget* widget);
+
+	//! Returns the font
+	inline const QFont& font() const { return m_font; }
+
+	//shortcuts
+	void setWindowTitle(QString title) { setTitle(title); }
+	QString windowTitle() const { return title(); }
+
+#endif
 
 	//! Sets 'scene graph' root
 	void setSceneDB(ccHObject* root);
@@ -124,21 +161,27 @@ public:
 	//! Returns current 'scene graph' root
 	ccHObject* getSceneDB();
 
+	//replacement for the missing methods of QGLWidget
+	void renderText(int x, int y, const QString & str, const QFont & font = QFont());
+	void renderText(double x, double y, double z, const QString & str, const QFont & font = QFont());
+
 	//inherited from ccGenericGLDisplay
-	virtual void toBeRefreshed();
-	virtual void refresh(bool only2D = false);
-	virtual void invalidateViewport();
-	virtual void releaseTexture(unsigned texID);
-	virtual void display3DLabel(const QString& str, const CCVector3& pos3D, const unsigned char* rgbColor = 0, const QFont& font = QFont());
-	virtual bool supportOpenGLVersion(unsigned openGLVersionFlag);
-	virtual void displayText(QString text, int x, int y, unsigned char align = ALIGN_DEFAULT, float bkgAlpha = 0, const unsigned char* rgbColor = 0, const QFont* font = 0);
-	virtual QFont getTextDisplayFont() const; //takes rendering zoom into account!
-	virtual QFont getLabelDisplayFont() const; //takes rendering zoom into account!
-	virtual const ccViewportParameters& getViewportParameters() const { return m_viewportParams; }
-	virtual void setupProjectiveViewport(const ccGLMatrixd& cameraMatrix, float fov_deg = 0.0f, float ar = 1.0f, bool viewerBasedPerspective = true, bool bubbleViewMode = false);
-	virtual unsigned getTextureID(const QImage& image);
-	virtual unsigned getTextureID( ccMaterial::CShared mtl);
-	virtual QWidget* asWidget() { return this; }
+	virtual void toBeRefreshed() override;
+	virtual void refresh(bool only2D = false) override;
+	virtual void invalidateViewport() override;
+	virtual void display3DLabel(const QString& str, const CCVector3& pos3D, const unsigned char* rgbColor = 0, const QFont& font = QFont()) override;
+	virtual void displayText(QString text, int x, int y, unsigned char align = ALIGN_DEFAULT, float bkgAlpha = 0, const unsigned char* rgbColor = 0, const QFont* font = 0) override;
+	virtual QFont getTextDisplayFont() const override; //takes rendering zoom into account!
+	virtual QFont getLabelDisplayFont() const override; //takes rendering zoom into account!
+	virtual const ccViewportParameters& getViewportParameters() const override { return m_viewportParams; }
+	virtual void setupProjectiveViewport(const ccGLMatrixd& cameraMatrix, float fov_deg = 0.0f, float ar = 1.0f, bool viewerBasedPerspective = true, bool bubbleViewMode = false) override;
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+	inline virtual QWidget* asWidget() override { return m_parentWidget; }
+#else
+	inline virtual QWidget* asWidget() override { return this; }
+#endif
+	inline virtual QSize getScreenSize() const override { return size(); }
+	virtual void getGLCameraParameters(ccGLCameraParameters& params) override;
 
 	//! Displays a status message in the bottom-left corner
 	/** WARNING: currently, 'append' is not supported for SCREEN_CENTER_MESSAGE
@@ -288,23 +331,16 @@ public:
 	**/
 	virtual const void setBaseViewMat(ccGLMatrixd& mat);
 
-	//! Returns the current (OpenGL) view matrix as a double array
-	/** Warning: different from 'view' matrix returned by getBaseViewMat.
-	**/
-	virtual const double* getModelViewMatd();
-	//! Returns the current (OpenGL) projection matrix as a double array
-	virtual const double* getProjectionMatd();
-	//! Returns the current viewport (OpenGL int[4] array)
-	virtual void getViewportArray(int vp[/*4*/]);
-
 	//! Sets camera to a predefined view (top, bottom, etc.)
 	virtual void setView(CC_VIEW_ORIENTATION orientation, bool redraw = true);
 
 	//! Sets camera to a custom view (forward and up directions must be specified)
 	virtual void setCustomView(const CCVector3d& forward, const CCVector3d& up, bool forceRedraw = true);
 
-	//! Sets current interaction mode
-	virtual void setInteractionMode(INTERACTION_MODE mode);
+	//! Sets current interaction flags
+	virtual void setInteractionMode(INTERACTION_FLAGS flags);
+	//! Returns the current interaction flags
+	inline virtual INTERACTION_FLAGS getInteractionMode() const { return m_interactionFlags; }
 
 	//! Sets current picking mode
 	/** Picking can be applied to entities (default), points, triangles, etc.)
@@ -401,9 +437,6 @@ public:
 	virtual bool areShadersEnabled() const;
 	virtual bool areGLFiltersEnabled() const;
 
-	//! Enables "embedded icons"
-	virtual void enableEmbeddedIcons(bool state);
-
 	//! Returns the actual pixel size on screen (taking zoom or perspective parameters into account)
 	/** In perspective mode, this value is approximate.
 	**/
@@ -456,6 +489,14 @@ public:
 	//! Whether display parameters are overidden for this window
 	bool hasOverridenDisplayParameters() const { return m_overridenDisplayParametersEnabled; }
 
+	//! Default picking radius value
+	static const int DefaultPickRadius = 5;
+
+	//! Sets picking radius
+	inline void setPickingRadius(int radius) { m_pickRadius = radius; }
+	//! Returns the current picking radius
+	inline int getPickingRadius() const { return m_pickRadius; }
+
 	//! Sets whether overlay entities (scale, tetrahedron, etc.) should be displayed or not
 	void displayOverlayEntities(bool state) { m_displayOverlayEntities = state; }
 
@@ -484,32 +525,50 @@ public:
 	//! Returns unique ID
 	inline int getUniqueID() const { return m_uniqueID; }
 
+public: //LOD
+
 	//! Returns whether LOD is enabled on this display or not
 	inline bool isLODEnabled() const { return m_LODEnabled; }
 
 	//! Enables or disables LOD on this display
-	inline void setLODEnabled(bool state, bool autoDisable = false) { m_LODEnabled = state; m_LODAutoDisable = autoDisable; }
+	/** \return success
+	**/
+	bool setLODEnabled(bool state, bool autoDisable = false);
 
-	//! Whether the middle-screen cross should be displayed or not
-	bool crossShouldBeDrawn() const;
+public: //fullscreen
 
-	//! Main OpenGL display sequence
-	void draw3D(CC_DRAW_CONTEXT& context, bool doDrawCross);
+	//! Toggles (exclusive) full-screen mode
+	void toggleExclusiveFullScreen(bool state);
+
+	//! Returns whether the window is in exclusive full screen mode or not
+	inline bool exclusiveFullScreen() const { return m_exclusiveFullscreen; }
+
+public: //debug traces on screen
+
+	//! Shows debug info on screen
+	inline void enableDebugTrace(bool state) { m_showDebugTraces = state; }
+
+	//! Toggles debug info on screen
+	inline void toggleDebugTrace() { m_showDebugTraces = !m_showDebugTraces; }
 
 public: //stereo mode
 
-	//! Enables the stereo display mode
-	inline void enableStereoMode(bool state) { m_stereoIsEnabled = state; }
-
-	//! Returns whether the stereo display mode is enabled or not
-	inline bool isStereoModeEnabled() const { return m_stereoIsEnabled; }
-	
 	//! Seterovision parameters
 	struct StereoParams
 	{
 		StereoParams();
 
-		enum GlassType { RED_BLUE = 1, RED_CYAN = 2 };
+		//! Glass/HMD type
+		enum GlassType {	RED_BLUE = 1,
+							BLUE_RED = 2,
+							RED_CYAN = 3,
+							CYAN_RED = 4,
+							NVIDIA_VISION = 5,
+							OCULUS = 6
+		};
+
+		//! Whether stereo-mode is 'analgyph' or real stereo mode
+		inline bool isAnaglyph() const { return glassType <= 4; }
 		
 		bool autoFocal;
 		double focalDist;
@@ -517,11 +576,17 @@ public: //stereo mode
 		GlassType glassType;
 	};
 
+	//! Enables stereo display mode
+	bool enableStereoMode(const StereoParams& params);
+
+	//! Disables stereo display mode
+	void disableStereoMode();
+
+	//! Returns whether the stereo display mode is enabled or not
+	inline bool stereoModeIsEnabled() const { return m_stereoModeEnabled; }
+	
 	//! Returns the current stereo mode parameters
 	inline const StereoParams& getStereoParams() const { return m_stereoParams; }
-
-	//! Sets the current stereo mode parameters
-	void setStereoParams(const StereoParams& params);
 
 public slots:
 
@@ -529,7 +594,7 @@ public slots:
 	void zoomGlobal();
 
 	//inherited from ccGenericGLDisplay
-	virtual void redraw(bool only2D = false);
+	virtual void redraw(bool only2D = false, bool resetLOD = true) override;
 
 	//called when recieving mouse wheel is rotated
 	void onWheelEvent(float wheelDelta_deg);
@@ -537,7 +602,22 @@ public slots:
 	//! Tests frame rate
 	void startFrameRateTest();
 
+	//! Request an update of the display
+	/** The request will be executed if not in auto refresh mode already
+	**/
+	void requestUpdate();
+
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+	//! For compatibility with the QOpenGLWidget version
+	inline void update() { paintGL(); }
+#endif
+
 protected slots:
+
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+	//! Updates the display
+	void paintGL();
+#endif
 
 	//! Renders the next L.O.D. level
 	void renderNextLODLevel();
@@ -546,33 +626,37 @@ protected slots:
 	void stopFrameRateTest();
 
 	//! Reacts to the itemPickedFast signal
-	void onItemPickedFast(int entityID, int subEntityID, int x, int y);
+	void onItemPickedFast(ccHObject* pickedEntity, int pickedItemIndex, int x, int y);
 
 	//! Checks for scheduled redraw
 	void checkScheduledRedraw();
 
+	//! OpenGL KHR debug log
+	void handleLoggedMessage(const QOpenGLDebugMessage&);
+
 signals:
 
 	//! Signal emitted when an entity is selected in the 3D view
-	void entitySelectionChanged(int uniqueID);
+	void entitySelectionChanged(ccHObject*);
 	//! Signal emitted when multiple entities are selected in the 3D view
-	void entitiesSelectionChanged(std::set<int> entIDs);
+	void entitiesSelectionChanged(std::unordered_set<int> entIDs);
 
 	//! Signal emitted when a point (or a triangle) is picked
-	/** \param entityID entity unique ID
+	/** \param entity 'picked' entity
 		\param subEntityID point or triangle index in entity
 		\param x mouse cursor x position
 		\param y mouse cursor y position
+		\param P the picked point
 	**/
-	void itemPicked(int entityID, unsigned subEntityID, int x, int y);
+	void itemPicked(ccHObject* entity, unsigned subEntityID, int x, int y, const CCVector3& P);
 
 	//! Signal emitted when an item is picked (FAST_PICKING mode only)
-	/** \param entityID entity unique ID
+	/** \param entity entity
 		\param subEntityID point or triangle index in entity
 		\param x mouse cursor x position
 		\param y mouse cursor y position
 	**/
-	void itemPickedFast(int entityID, int subEntityID, int x, int y);
+	void itemPickedFast(ccHObject* entity, int subEntityID, int x, int y);
 
 	//! Signal emitted when fast picking is finished (FAST_PICKING mode only)
 	void fastPickingFinished();
@@ -598,6 +682,9 @@ signals:
 	//! Signal emitted when the f.o.v. changes
 	void fovChanged(float);
 
+	//! Signal emitted when the zNear coef changes
+	void zNearCoefChanged(float);
+
 	//! Signal emitted when the pivot point is changed
 	void pivotPointChanged(const CCVector3d&);
 
@@ -613,26 +700,28 @@ signals:
 	void rotation(const ccGLMatrixd& rotMat);
 
 	//! Signal emitted when the left mouse button is cliked on the window
-	/** Arguments correspond to the clicked point coordinates (x,y) in
-		pixels and relatively to the window center.
+	/** See INTERACT_SIG_LB_CLICKED.
+		Arguments correspond to the clicked point coordinates (x,y) in
+		pixels and relatively to the window corner!
 	**/
 	void leftButtonClicked(int, int);
 
 	//! Signal emitted when the right mouse button is cliked on the window
-	/** Arguments correspond to the clicked point coordinates (x,y) in
-		pixels and relatively to the window center.
+	/** See INTERACT_SIG_RB_CLICKED.
+		Arguments correspond to the clicked point coordinates (x,y) in
+		pixels and relatively to the window corner!
 	**/
 	void rightButtonClicked(int, int);
 
 	//! Signal emitted when the mouse is moved
-	/** SEGMENT_ENTITY mode only with either a button pressed or m_alwaysUseFBO=true! (too slow otherwise)
-		Two first arguments correspond to the current cursor coordinates (x,y)
-		in pixels and relatively to the window center.
+	/** See INTERACT_SIG_MOUSE_MOVED.
+		The two first arguments correspond to the current cursor coordinates (x,y)
+		relatively to the window corner!
 	**/
 	void mouseMoved(int, int, Qt::MouseButtons);
 
 	//! Signal emitted when a mouse button is released (cursor on the window)
-	/** SEGMENT_ENTITY mode only!
+	/** See INTERACT_SIG_BUTTON_RELEASED.
 	**/
 	void buttonReleased();
 
@@ -648,7 +737,115 @@ signals:
 	//! Signal emitted when a new label is created
 	void newLabel(ccHObject* obj);
 
-protected: //methods
+	//! Signal emitted when the exclusive fullscreen is toggled
+	void exclusiveFullScreenToggled(bool);
+
+protected: //rendering
+
+	//Default OpenGL functions set
+	typedef QOpenGLFunctions_2_1 ccQOpenGLFunctions;
+
+	//! Returns the set of OpenGL functions
+	inline ccQOpenGLFunctions* functions() const { return context() ? context()->versionFunctions<ccQOpenGLFunctions>() : 0; }
+
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+	//! Returns the context (if any)
+	inline QOpenGLContext* context() const { return m_context; }
+#endif
+
+	//reimplemented from QOpenGLWidget
+	//Because QOpenGLWidget::makeCurrent silently binds the widget's own FBO,
+	//we need to automatically bind our own afterwards!
+	//(Sadly QOpenGLWidget::makeCurrentmakeCurrent is not virtual)
+	void makeCurrent();
+
+	//! Binds an FBO or releases the current one (if input is NULL)
+	/** This method must be called instead of the FBO's own 'start' and 'stop' methods
+		so as to properly handle the interactions with QOpenGLWidget's own FBO.
+	**/
+	bool bindFBO(ccFrameBufferObject* fbo);
+
+	//! LOD state
+	struct LODState
+	{
+		LODState()
+			: inProgress(false)
+			, level(0)
+			, startIndex(0)
+			, progressIndicator(0)
+		{}
+
+		//! LOD display in progress
+		bool inProgress;
+		//! Currently rendered LOD level
+		unsigned char level;
+		//! Currently rendered LOD start index
+		unsigned startIndex;
+		//! Currently LOD progress indicator
+		unsigned progressIndicator;
+	};
+
+	//! Rendering params
+	struct RenderingParams
+	{
+		RenderingParams()
+			: passIndex(0)
+			, passCount(1)
+			, drawBackground(true)
+			, clearDepthLayer(true)
+			, clearColorLayer(true)
+			, draw3DPass(true)
+			, useFBO(false)
+			, draw3DCross(false)
+			, drawForeground(true)
+		{}
+
+		unsigned char passIndex;
+		unsigned char passCount;
+
+		//2D background
+		bool drawBackground;
+		bool clearDepthLayer;
+		bool clearColorLayer;
+
+		//3D central layer
+		bool draw3DPass;
+		bool useFBO;
+		bool draw3DCross;
+		//! Next LOD state
+		LODState nextLODState;
+
+		//2D foreground
+		bool drawForeground;
+	};
+
+	//! Full rendering pass (drawBackground + draw3D + drawForeground)
+	void fullRenderingPass(CC_DRAW_CONTEXT& context, RenderingParams& params);
+
+	//! Draws the background layer
+	/** Background + 2D background objects
+	**/
+	void drawBackground(CC_DRAW_CONTEXT& context, RenderingParams& params);
+
+	//! Draws the main 3D layer
+	void draw3D(CC_DRAW_CONTEXT& context, RenderingParams& params);
+
+	//! Draws the foreground layer
+	/** 2D foreground objects / text
+	**/
+	void drawForeground(CC_DRAW_CONTEXT& context, RenderingParams& params);
+
+protected: //other methods
+
+	//! Returns the current (OpenGL) view matrix
+	/** Warning: may be different from the 'view' matrix returned by getBaseViewMat.
+		Will call automatically updateModelViewMatrix if necessary.
+	**/
+	virtual const ccGLMatrixd& getModelViewMatrix();
+	//! Returns the current (OpenGL) projection matrix
+	/** Will call automatically updateProjectionMatrix if necessary.
+	**/
+	virtual const ccGLMatrixd& getProjectionMatrix();
 
 	//! Processes the clickable items
 	/** \return true if an item has been clicked
@@ -662,65 +859,47 @@ protected: //methods
 	void setFontPointSize(int pixelSize);
 
 	//events handling
-	void mousePressEvent(QMouseEvent *event);
-	void mouseMoveEvent(QMouseEvent *event);
-	void mouseReleaseEvent(QMouseEvent *event);
-	void wheelEvent(QWheelEvent *event);
-	void closeEvent(QCloseEvent *event);
+	void mousePressEvent(QMouseEvent *event) override;
+	void mouseMoveEvent(QMouseEvent *event) override;
+	void mouseReleaseEvent(QMouseEvent *event) override;
+	void wheelEvent(QWheelEvent *event) override;
+	bool event(QEvent* evt) override;
 
-	//inherited
-	void initializeGL();
+	bool initialize();
+	GLuint defaultQtFBO() const;
+
+#ifdef CC_GL_WINDOW_USE_QWINDOW
 	void resizeGL(int w, int h);
-	void paintGL();
-	bool event(QEvent* evt);
-
-#ifdef THREADED_GL_WIDGET
-	void initialize();
-	void resizeGL2();
-	void paint();
-	void resizeEvent(QResizeEvent* evt);
-	void glInit() { /*stop QGLWidget standard behavior*/ }
-	void glDraw() { /*stop QGLWidget standard behavior*/ }
-
-	//! Rendering thread
-	class RenderingThread : public QThread
-	{
-	public:
-
-		explicit RenderingThread(ccGLWindow* win);
-		~RenderingThread() { stop(); }
-		
-		void stop();
-		void redraw();
-
-	protected:
-
-		virtual void run();
-
-		ccGLWindow* m_window;
-		QWaitCondition m_waitCondition;
-		QAtomicInt m_abort;
-		QAtomicInt m_pendingRedraw;
-	};
-
-	friend RenderingThread;
-
-	RenderingThread* m_renderingThread;
-	QMutex m_mutex;
-	QGLFormat m_format;
-	const QGLWidget* m_shareWidget; 
-	QAtomicInt m_resized;
+	virtual void dragEnterEvent(QDragEnterEvent* event);
+	virtual void dropEvent(QDropEvent* event);
+#else
+	void initializeGL() override { initialize(); }
+	void resizeGL(int w, int h) override;
+	void paintGL() override;
+	virtual void dragEnterEvent(QDragEnterEvent* event) override;
+	virtual void dropEvent(QDropEvent* event) override;
 #endif
 
 	//Graphical features controls
 	void drawCross();
 	void drawTrihedron();
-	void drawGradientBackground();
 	void drawScale(const ccColor::Rgbub& color);
 
-	//Projections controls
+	//! Computes the model view matrix
 	ccGLMatrixd computeModelViewMatrix(const CCVector3d& cameraCenter) const;
-	ccGLMatrixd computeProjectionMatrix(const CCVector3d& cameraCenter, double& zNear, double& zFar, bool withGLfeatures) const;
+
+	//! Optional output metrics (from computeProjectionMatrix)
+	struct ProjectionMetrics
+	{
+		ProjectionMetrics() : zNear(0), zFar(0), cameraToBBCenterDist(0), bbHalfDiag(0) {}
+		double zNear, zFar, cameraToBBCenterDist, bbHalfDiag;
+	};
+
+	//! Computes the projection matrix
+	ccGLMatrixd computeProjectionMatrix(	const CCVector3d& cameraCenter,
+											bool withGLfeatures, 
+											ProjectionMetrics* metrics = 0, 
+											double* eyeOffset = 0) const;
 	void updateModelViewMatrix();
 	void updateProjectionMatrix();
 	void setStandardOrthoCenter();
@@ -736,10 +915,6 @@ protected: //methods
 	//! Draws pivot point symbol in 3D
 	void drawPivot();
 
-	//inherited from QWidget (drag & drop support)
-	virtual void dragEnterEvent(QDragEnterEvent* event);
-	virtual void dropEvent(QDropEvent* event);
-
 	//! Picking parameters
 	struct PickingParameters
 	{
@@ -748,13 +923,16 @@ protected: //methods
 							int _centerX = 0,
 							int _centerY = 0,
 							int _pickWidth = 5,
-							int _pickHeight = 5)
+							int _pickHeight = 5,
+							bool _pickInSceneDB = true,
+							bool _pickInLocalDB = true)
 			: mode(_mode)
 			, centerX(_centerX)
 			, centerY(_centerY)
 			, pickWidth(_pickWidth)
 			, pickHeight(_pickHeight)
-			, flags(0)
+			, pickInSceneDB(_pickInSceneDB)
+			, pickInLocalDB(_pickInLocalDB)
 		{}
 
 		PICKING_MODE mode;
@@ -762,13 +940,12 @@ protected: //methods
 		int centerY;
 		int pickWidth;
 		int pickHeight;
-		unsigned short flags;
+		bool pickInSceneDB;
+		bool pickInLocalDB;
 	};
 
 	//! Starts picking process
-	/** OpenGL is used by default (unless ccGui::ParamStruct::useOpenGLPointPicking
-		is false in which case a CPU based approach will be used for point picking).
-		\param params picking parameters
+	/** \param params picking parameters
 	**/
 	void startPicking(PickingParameters& params);
 
@@ -779,7 +956,11 @@ protected: //methods
 	void startCPUBasedPointPicking(const PickingParameters& params);
 
 	//! Processes the picking process result and sends the corresponding signal
-	void processPickingResult(const PickingParameters& params, int selectedID, int subSelectedID, const std::set<int>* selectedIDs = 0);
+	void processPickingResult(	const PickingParameters& params,
+								ccHObject* pickedEntity,
+								int pickedItemIndex,
+								const CCVector3* nearestPoint = 0,
+								const std::unordered_set<int>* selectedIDs = 0);
 	
 	//! Updates currently active items list (m_activeItems)
 	/** The items must be currently displayed in this context
@@ -794,11 +975,15 @@ protected: //methods
 
 	//! Inits FBO (frame buffer object)
 	bool initFBO(int w, int h);
+	//! Inits FBO (safe)
+	bool initFBOSafe(ccFrameBufferObject* &fbo, int w, int h);
 	//! Releases any active FBO
 	void removeFBO();
+	//! Releases any active FBO (safe)
+	void removeFBOSafe(ccFrameBufferObject* &fbo);
 
 	//! Inits active GL filter (advanced shader)
-	bool initGLFilter(int w, int h);
+	bool initGLFilter(int w, int h, bool silent = false);
 	//! Releases active GL filter
 	void removeGLFilter();
 
@@ -824,7 +1009,7 @@ protected: //methods
 
 	//! Schedules a full redraw
 	/** Any previously scheduled redraw will be cancelled.
-		\warning The redraw will be cancelled if redraw/updateGL is called before.
+		\warning The redraw will be cancelled if redraw/update is called before.
 		\param maxDelay_ms the maximum delay for the call to redraw (in ms)
 	**/
 	void scheduleFullRedraw(unsigned maxDelay_ms);
@@ -834,18 +1019,46 @@ protected: //methods
 	**/
 	void cancelScheduledRedraw();
 
-protected: //OpenGL Extensions
+	//! Sets the OpenGL viewport (shortut)
+	inline void setGLViewport(int x, int y, int w, int h) { setGLViewport(QRect(x, y, w, h)); }
+	//! Sets the OpenGL viewport
+	void setGLViewport(const QRect& rect);
+	//! Returns the current (OpenGL) viewport
+	inline const QRect& getGLViewport() const { return m_glViewport; }
 
-	//! Loads OpenGL extensions
-	/** Wrapper around ccFBOUtils::InitGLEW.
-		\return success
+	//! Logs a GL error
+	/** Logs a warning or error message corresponding to the input GL error.
+		If error == GL_NO_ERROR, nothing is logged.
+
+		\param error GL error code
+		\param context name of the method/object that catched the error
+		\return true if an error occurred, false otherwise
 	**/
-	static bool InitGLEW();
+	static void LogGLError(GLenum error, const char* context);
+
+	//! Logs a GL error (shortcut)
+	void logGLError(const char* context) const;
+
+	//! Toggles auto-refresh mode
+	void toggleAutoRefresh(bool state, int period_ms = 0);
 
 protected: //members
 
-	//! GL names picking buffer
-	GLuint m_pickingBuffer[CC_PICKING_BUFFER_SIZE];
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+
+	//! Associated OpenGL context
+	QOpenGLContext* m_context;
+
+	//! OpenGL device
+	QOpenGLPaintDevice* m_device;
+
+	//! Format
+	QSurfaceFormat m_format;
+
+	//! Associated widget (we use the WidgetContainer mechanism)
+	QWidget* m_parentWidget;
+
+#endif
 
 	//! Unique ID
 	int m_uniqueID;
@@ -877,11 +1090,13 @@ protected: //members
 	ccGLMatrixd m_projMatd;
 	//! Whether the projection matrix is valid (or need to be recomputed)
 	bool m_validProjectionMatrix;
+	//! Distance between the camera and the displayed objects bounding-box
+	double m_cameraToBBCenterDist;
+	//! Half size of the displayed objects bounding-box
+	double m_bbHalfDiag;
 
-	//! GL context width
-	int m_glWidth;
-	//! GL context height
-	int m_glHeight;
+	//! GL viewport
+	QRect m_glViewport;
 
 	//! Whether L.O.D. (level of detail) is enabled or not
 	bool m_LODEnabled;
@@ -895,8 +1110,8 @@ protected: //members
 	bool m_mouseButtonPressed;
 	//! Whether this 3D window can be closed by the user or not
 	bool m_unclosable;
-	//! Current intercation mode (with mouse)
-	INTERACTION_MODE m_interactionMode;
+	//! Current intercation flags
+	INTERACTION_FLAGS m_interactionFlags;
 	//! Current picking mode
 	PICKING_MODE m_pickingMode;
 	//! Whether picking mode is locked or not
@@ -926,7 +1141,7 @@ protected: //members
 		//! Message
 		QString message;
 		//! Message end time (sec)
-		int messageValidity_sec;
+		qint64 messageValidity_sec;
 		//! Message position on screen
 		MessagePosition position;
 		//! Message type
@@ -953,11 +1168,6 @@ protected: //members
 	//! Whether custom light is enabled or not
 	bool m_customLightEnabled;
 
-	//! Whether embedded icons (point size, etc.) are enabled or not
-	bool m_embeddedIconsEnabled;
-	//! Hot zone (= where embedded icons lie) is activated (= mouse over)
-	bool m_hotZoneActivated;
-
 	//! Clickable item
 	struct ClickableItem
 	{
@@ -965,6 +1175,7 @@ protected: //members
 					INCREASE_POINT_SIZE,
 					DECREASE_POINT_SIZE,
 					LEAVE_BUBBLE_VIEW_MODE,
+					LEAVE_FULLSCREEN_MODE,
 		};
 
 		Role role;
@@ -976,13 +1187,20 @@ protected: //members
 	//! Currently displayed clickable items
 	std::vector<ClickableItem> m_clickableItems;
 
+	//! Whether clickable items are visible (= mouse over) or not
+	bool m_clickableItemsVisible;
+
 	//! Currently active shader
 	ccShader* m_activeShader;
 	//! Whether shaders are enabled or not
 	bool m_shadersEnabled;
 
 	//! Currently active FBO (frame buffer object)
+	ccFrameBufferObject* m_activeFbo;
+	//! First default FBO (frame buffer object)
 	ccFrameBufferObject* m_fbo;
+	//! Second default FBO (frame buffer object) - used for stereo rendering
+	ccFrameBufferObject* m_fbo2;
 	//! Whether to always use FBO or only for GL filters
 	bool m_alwaysUseFBO;
 	//! Whether FBO should be updated (or simply displayed as a texture = faster!)
@@ -1041,18 +1259,9 @@ protected: //members
 	//! Pre-bubble-view camera parameters (backup)
 	ccViewportParameters m_preBubbleViewParameters;
 
-	//! Map of materials (unique id.) and texture identifier
-	QMap< QString, unsigned > m_materialTextures;
+	//! Current LOD state
+	LODState m_currentLODState;
 
-	//! Currently rendered LOD level
-	unsigned char m_currentLODLevel;
-	//! Currently rendered LOD start index
-	unsigned m_currentLODStartIndex;
-	//! Currently LOD progress indicator
-	unsigned m_LODProgressIndicator;
-
-	//! LOD display in progress
-	bool m_LODInProgress;
 	//! LOD refresh signal sent
 	bool m_LODPendingRefresh;
 	//! LOD refresh signal should be ignored
@@ -1074,8 +1283,34 @@ protected: //members
 	//! Seterovision mode parameters
 	StereoParams m_stereoParams;
 
-	//! Seterovision mode parameters
-	bool m_stereoIsEnabled;
+	//! Whether seterovision mode is enabled or not
+	bool m_stereoModeEnabled;
+
+	//! Former parent object (for exclusive full-screen display)
+	QWidget* m_formerParent;
+
+	//! Wether exclusive full screen is enabled or not
+	bool m_exclusiveFullscreen;
+	
+	//! Former geometry (for exclusive full-screen display)
+	QByteArray m_formerGeometry;
+
+	//! Debug traces visibility
+	bool m_showDebugTraces;
+
+	//! Picking radius (pixels)
+	int m_pickRadius;
+
+	//! FBO support
+	QOpenGLExtension_ARB_framebuffer_object	m_glExtFunc;
+
+	//! Whether FBO support is on
+	bool m_glExtFuncSupported;
+
+	//! Auto-refresh mode
+	bool m_autoRefresh;
+	//! Auto-refresh timer
+	QTimer m_autoRefreshTimer;
 
 private:
 
@@ -1083,4 +1318,6 @@ private:
 	static QString getShadersPath();
 };
 
-#endif
+Q_DECLARE_OPERATORS_FOR_FLAGS(ccGLWindow::INTERACTION_FLAGS);
+
+#endif //CC_GL_WINDOW_HEADER

@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -19,9 +20,8 @@
 #define DISTANCE_COMPUTATION_TOOLS_HEADER
 
 //Local
-#include "CCCoreLib.h"
-#include "CCToolbox.h"
 #include "CCConst.h"
+#include "CCToolbox.h"
 #include "DgmOctree.h"
 
 namespace CCLib
@@ -35,6 +35,7 @@ class ReferenceCloud;
 class ChunkedPointCloud;
 class GenericProgressCallback;
 struct OctreeAndMeshIntersection;
+class ScalarField;
 
 //! Several entity-to-entity distances computation algorithms (cloud-cloud, cloud-mesh, point-triangle, etc.)
 class CC_CORE_LIB_API DistanceComputationTools : public CCToolbox
@@ -59,6 +60,9 @@ public: //distance to clouds or meshes
 		/** If maxSearchDist > 0, single thread mode will be forced.
 		**/
 		bool multiThread;
+
+		//! Maximum number of threads to use (0 = max)
+		int maxThreadCount;
 
 		//! Type of local 3D modeling to use
 		/** Default: NO_MODEL. Otherwise see CC_LOCAL_MODEL_TYPES.
@@ -94,6 +98,9 @@ public: //distance to clouds or meshes
 		**/
 		ReferenceCloud* CPSet;
 
+		//! Split distances (one scalar field per dimension: X, Y and Z)
+		ScalarField* splitDistances[3];
+
 		//! Whether to keep the existing distances as is (if any) or not
 		/** By default, any previous distances/scalar values stored in the 'enabled' scalar field will be
 			reset before computing them again.
@@ -105,6 +112,7 @@ public: //distance to clouds or meshes
 			: octreeLevel(0)
 			, maxSearchDist(0)
 			, multiThread(true)
+			, maxThreadCount(0)
 			, localModel(NO_MODEL)
 			, useSphericalSearchForLocalModel(false)
 			, kNNForLocalModel(0)
@@ -112,7 +120,9 @@ public: //distance to clouds or meshes
 			, reuseExistingLocalModels(false)
 			, CPSet(0)
 			, resetFormerDistances(true)
-		{}
+		{
+			splitDistances[0] = splitDistances[1] = splitDistances[2] = 0;
+		}
 	};
 
 	//! Computes the "nearest neighbour distance" between two point clouds (formerly named "Hausdorff distance")
@@ -169,6 +179,9 @@ public: //distance to clouds or meshes
 		//! Whether to use multi-thread or single thread mode (if maxSearchDist > 0, single thread mode is forced)
 		bool multiThread;
 
+		//! Maximum number of threads to use (0 = max)
+		int maxThreadCount;
+
 		//! Cloud to store the Closest Point Set
 		/** The cloud should be initialized but empty on input. It will have the same size as the compared cloud on output.
 			\warning Not compatible with maxSearchDist > 0.
@@ -183,6 +196,7 @@ public: //distance to clouds or meshes
 			, signedDistances(false)
 			, flipNormals(false)
 			, multiThread(true)
+			, maxThreadCount(0)
 			, CPSet(0)
 		{}
 	};

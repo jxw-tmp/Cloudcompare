@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -383,10 +383,12 @@ bool ccMaterialSet::append(const ccMaterialSet& source)
 		{
 			ccMaterial::CShared mtl = *it;
 			if (addMaterial(mtl) <= 0)
+			{
 				ccLog::WarningDebug(QString("[ccMaterialSet::append] Material %1 couldn't be added to material set and will be ignored").arg(mtl->getName()));
+			}
 		}
 	}
-	catch(.../*const std::bad_alloc&*/) //out of memory
+	catch (.../*const std::bad_alloc&*/) //out of memory
 	{
 		ccLog::Warning("[ccMaterialSet::append] Not enough memory");
 		return false;

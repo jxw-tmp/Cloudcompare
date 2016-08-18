@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -27,11 +27,11 @@
 //Default 'min cloud size' for LoD  when VBOs are activated
 static const double s_defaultMaxVBOCloudSizeM = 50.0;
 
-ccDisplayOptionsDlg::ccDisplayOptionsDlg(QWidget* parent) : QDialog(parent), Ui::DisplayOptionsDlg()
+ccDisplayOptionsDlg::ccDisplayOptionsDlg(QWidget* parent)
+	: QDialog(parent, Qt::Tool)
+	, Ui::DisplayOptionsDlg()
 {
 	setupUi(this);
-
-	setWindowFlags(Qt::Tool/*Qt::Dialog | Qt::WindowStaysOnTopHint*/);
 
 	connect(ambientColorButton,              SIGNAL(clicked()),         this, SLOT(changeLightAmbientColor()));
 	connect(diffuseColorButton,              SIGNAL(clicked()),         this, SLOT(changeLightDiffuseColor()));
@@ -50,7 +50,6 @@ ccDisplayOptionsDlg::ccDisplayOptionsDlg(QWidget* parent) : QDialog(parent), Ui:
 	connect(decimateCloudBox,                SIGNAL(clicked()),         this, SLOT(changeCloudDecimation()));
 	connect(useVBOCheckBox,                  SIGNAL(clicked()),         this, SLOT(changeVBOUsage()));
 	connect(showCrossCheckBox,               SIGNAL(clicked()),         this, SLOT(changeCrossDisplayed()));
-	connect(openGLPickingCheckBox,           SIGNAL(clicked()),         this, SLOT(changeOpenGLPicking()));
 
 	connect(colorScaleShowHistogramCheckBox, SIGNAL(clicked()),         this, SLOT(changeColorScaleShowHistogram()));
 	connect(useColorScaleShaderCheckBox,     SIGNAL(clicked()),         this, SLOT(changeColorScaleUseShader()));
@@ -65,6 +64,8 @@ ccDisplayOptionsDlg::ccDisplayOptionsDlg(QWidget* parent) : QDialog(parent), Ui:
 	connect(zoomSpeedDoubleSpinBox,          SIGNAL(valueChanged(double)), this, SLOT(changeZoomSpeed(double)));
 	connect(maxCloudSizeDoubleSpinBox,       SIGNAL(valueChanged(double)), this, SLOT(changeMaxCloudSize(double)));
 	connect(maxMeshSizeDoubleSpinBox,        SIGNAL(valueChanged(double)), this, SLOT(changeMaxMeshSize(double)));
+
+	connect(autoComputeOctreeComboBox,       SIGNAL(currentIndexChanged(int)), this, SLOT(changeAutoComputeOctreeOption(int)));
 
 	connect(okButton,                        SIGNAL(clicked()),         this, SLOT(doAccept()));
 	connect(applyButton,                     SIGNAL(clicked()),         this, SLOT(apply()));
@@ -135,7 +136,6 @@ void ccDisplayOptionsDlg::refresh()
 	maxCloudSizeDoubleSpinBox->setValue(static_cast<double>(parameters.minLoDCloudSize)/1000000.0);
 	useVBOCheckBox->setChecked(parameters.useVBOs);
 	showCrossCheckBox->setChecked(parameters.displayCross);
-	openGLPickingCheckBox->setChecked(parameters.useOpenGLPointPicking);
 
 	colorScaleShowHistogramCheckBox->setChecked(parameters.colorScaleShowHistogram);
 	useColorScaleShaderCheckBox->setChecked(parameters.colorScaleUseShader);
@@ -149,6 +149,8 @@ void ccDisplayOptionsDlg::refresh()
 	labelMarkerSizeSpinBox->setValue(parameters.labelMarkerSize);
 
 	zoomSpeedDoubleSpinBox->setValue(parameters.zoomSpeed);
+
+	autoComputeOctreeComboBox->setCurrentIndex(parameters.autoComputeOctree);
 
 	update();
 }
@@ -389,11 +391,6 @@ void ccDisplayOptionsDlg::changeCrossDisplayed()
 	parameters.displayCross = showCrossCheckBox->isChecked();
 }
 
-void ccDisplayOptionsDlg::changeOpenGLPicking()
-{
-	parameters.useOpenGLPointPicking = openGLPickingCheckBox->isChecked();
-}
-
 void ccDisplayOptionsDlg::changeColorScaleShowHistogram()
 {
 	parameters.colorScaleShowHistogram = colorScaleShowHistogramCheckBox->isChecked();
@@ -435,6 +432,12 @@ void ccDisplayOptionsDlg::changeNumberPrecision(int val)
 void ccDisplayOptionsDlg::changeZoomSpeed(double val)
 {
 	parameters.zoomSpeed = val;
+}
+
+void ccDisplayOptionsDlg::changeAutoComputeOctreeOption(int index)
+{
+	assert(index >= 0 && index < 3);
+	parameters.autoComputeOctree = static_cast<ccGui::ParamStruct::ComputeOctreeForPicking>(index);
 }
 
 void ccDisplayOptionsDlg::changeLabelOpacity(int val)

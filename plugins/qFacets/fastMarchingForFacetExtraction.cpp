@@ -4,31 +4,27 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#                           COPYRIGHT: BRGM                              #
+//#                      COPYRIGHT: Thomas Dewez, BRGM                     #
 //#                                                                        #
 //##########################################################################
 
 #include "fastMarchingForFacetExtraction.h"
 
 //qCC_db
-#include <ccNormalVectors.h>
 #include <ccGenericPointCloud.h>
 #include <ccPointCloud.h>
 #include <ccOctree.h>
-#include <ccLog.h>
 
 //Qt
 #include <QApplication>
 
-//system
-#include <assert.h>
 
 //! 26-connexity neighbouring cells positions (common edges)
 const int c_3dNeighboursPosShift[] = {-1,-1,-1,
@@ -119,9 +115,12 @@ int FastMarchingForFacetExtraction::init(	ccGenericPointCloud* cloud,
 
 	if (progressCb)
 	{
-		progressCb->reset();
-		progressCb->setMethodTitle("Fast Marching grid initialization");
-		progressCb->setInfo(qPrintable(QString("Level: %1").arg(level)));
+		if (progressCb->textCanBeEdited())
+		{
+			progressCb->setMethodTitle("Fast Marching grid initialization");
+			progressCb->setInfo(qPrintable(QString("Level: %1").arg(level)));
+		}
+		progressCb->update(0);
 		progressCb->start();
 	}
 
@@ -134,11 +133,10 @@ int FastMarchingForFacetExtraction::init(	ccGenericPointCloud* cloud,
 	theOctree->getCellCodes(level,cellCodes,true);
 	size_t cellCount = cellCodes.size();
 
-	CCLib::NormalizedProgress* nProgress = 0;
+	CCLib::NormalizedProgress nProgress(progressCb, static_cast<unsigned>(cellCount));
 	if (progressCb)
 	{
 		progressCb->setInfo(qPrintable(QString("Level: %1\nCells: %2").arg(level).arg(cellCount)));
-		nProgress = new CCLib::NormalizedProgress(progressCb,static_cast<unsigned>(cellCount));
 	}
 
 	CCLib::ReferenceCloud Yk(theOctree->associatedCloud());
@@ -174,20 +172,17 @@ int FastMarchingForFacetExtraction::init(	ccGenericPointCloud* cloud,
 
 		cellCodes.pop_back();
 
-		if (nProgress && !nProgress->oneStep())
+		if (progressCb && !nProgress.oneStep())
 		{
 			//process cancelled by user
 			progressCb->stop();
-			delete nProgress;
 			return -1;
 		}
 	}
 
-	if (nProgress)
+	if (progressCb)
 	{
 		progressCb->stop();
-		delete nProgress;
-		nProgress = 0;
 	}
 		
 	m_initialized = true;
@@ -501,8 +496,11 @@ int FastMarchingForFacetExtraction::ExtractPlanarFacets(	ccPointCloud* theCloud,
 
 	if (progressCb)
 	{
-		progressCb->setMethodTitle("Fast Marching for facets extraction");
-		progressCb->setInfo("Initializing...");
+		if (progressCb->textCanBeEdited())
+		{
+			progressCb->setMethodTitle("Fast Marching for facets extraction");
+			progressCb->setInfo("Initializing...");
+		}
 		progressCb->start();
 		QApplication::processEvents();
 	}
@@ -553,9 +551,12 @@ int FastMarchingForFacetExtraction::ExtractPlanarFacets(	ccPointCloud* theCloud,
 	//progress notification
 	if (progressCb)
 	{
-		progressCb->reset();
-		progressCb->setMethodTitle("Facets extraction");
-		progressCb->setInfo(qPrintable(QString("Octree level: %1\nPoints: %2").arg(octreeLevel).arg(numberOfPoints)));
+		progressCb->update(0);
+		if (progressCb->textCanBeEdited())
+		{
+			progressCb->setMethodTitle("Facets extraction");
+			progressCb->setInfo(qPrintable(QString("Octree level: %1\nPoints: %2").arg(octreeLevel).arg(numberOfPoints)));
+		}
 		progressCb->start();
 		QApplication::processEvents();
 	}
@@ -586,12 +587,12 @@ int FastMarchingForFacetExtraction::ExtractPlanarFacets(	ccPointCloud* theCloud,
 		//its corresponding cell in fact ;)
 		const CCVector3 *thePoint = theCloud->getPoint(lastProcessedPoint);
 		Tuple3i pos;
-		theOctree->getTheCellPosWhichIncludesThePoint(thePoint,pos,octreeLevel);
+		theOctree->getTheCellPosWhichIncludesThePoint(thePoint, pos, octreeLevel);
 
 		//clipping (in case the octree is not 'complete')
-		pos.x = std::min(octreeWidth,pos.x);
-		pos.y = std::min(octreeWidth,pos.y);
-		pos.z = std::min(octreeWidth,pos.z);
+		pos.x = std::min(octreeWidth, pos.x);
+		pos.y = std::min(octreeWidth, pos.y);
+		pos.z = std::min(octreeWidth, pos.z);
 
 		//set corresponding FM cell as 'seed'
 		if (!fm.setSeedCell(pos))

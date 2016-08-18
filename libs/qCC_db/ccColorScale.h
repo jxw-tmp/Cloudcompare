@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -19,18 +19,15 @@
 #define CC_COLOR_SCALE_HEADER
 
 //Local
-#include "qCC_db.h"
 #include "ccBasicTypes.h"
 #include "ccSerializableObject.h"
 
 //Qt
-#include <QString> 
 #include <QSharedPointer>
 #include <QColor>
 #include <QList>
 
 //System
-#include <assert.h>
 #include <set>
 
 //! Color scale element: one value + one color
@@ -110,12 +107,18 @@ public:
 	virtual ~ccColorScale();
 
 	//! Minimum number of steps
+	/** \warning Never pass a 'constant initializer' by reference
+	**/
 	static const unsigned MIN_STEPS = 2;
 
 	//! Default number of steps for display
+	/** \warning Never pass a 'constant initializer' by reference
+	**/
 	static const unsigned DEFAULT_STEPS = 256;
 
 	//! Maximum number of steps (internal representation)
+	/** \warning Never pass a 'constant initializer' by reference
+	**/
 	static const unsigned MAX_STEPS = 1024;
 
 	//! Returns name

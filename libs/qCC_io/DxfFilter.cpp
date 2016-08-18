@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -16,10 +16,6 @@
 //##########################################################################
 
 #include "DxfFilter.h"
-
-//Qt
-#include <QApplication>
-#include <QFile>
 
 //CCLib
 #include <ScalarField.h>
@@ -129,14 +125,19 @@ public:
 			//RGB field already instantiated?
 			if (m_points->hasColors())
 			{
+				//simply add the new color
 				m_points->addRGBColor(col.rgb);
 			}
-			//otherwise, reserve memory and set all previous points to white by default
-			else if (m_points->setRGBColor(ccColor::white))
+			else
 			{
-				//then replace the last color by the current one
-				m_points->setPointColor(m_points->size()-1,col.rgb);
+				//reserve memory (and fill the previous points with a default color if necessary)
+				if (!m_points->setRGBColor(ccColor::white))
+				{
+					ccLog::Error("[DxfImporter] Not enough memory!");
+					return;
+				}
 				m_points->showColors(true);
+				m_points->setPointColor(m_points->size()-1, ccColor::white.rgba); //replace the last color
 			}
 		}
 		else if (m_points->hasColors())
@@ -506,7 +507,7 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 	if (root->isKindOf(CC_TYPES::MESH))
 		meshes.push_back(root);
 
-	//only polylines are handled for now
+	//only polylines and meshes are handled for now
 	size_t polyCount = polylines.size();
 	size_t meshCount = meshes.size();
 	if (polyCount + meshCount == 0)
@@ -530,19 +531,19 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 				}
 				else
 				{
-					bbMinCorner.x = std::min(bbMinCorner.x,minC.x);
-					bbMinCorner.y = std::min(bbMinCorner.y,minC.y);
-					bbMinCorner.z = std::min(bbMinCorner.z,minC.z);
-					bbMaxCorner.x = std::max(bbMaxCorner.x,maxC.x);
-					bbMaxCorner.y = std::max(bbMaxCorner.y,maxC.y);
-					bbMaxCorner.z = std::max(bbMaxCorner.z,maxC.z);
+					bbMinCorner.x = std::min(bbMinCorner.x, minC.x);
+					bbMinCorner.y = std::min(bbMinCorner.y, minC.y);
+					bbMinCorner.z = std::min(bbMinCorner.z, minC.z);
+					bbMaxCorner.x = std::max(bbMaxCorner.x, maxC.x);
+					bbMaxCorner.y = std::max(bbMaxCorner.y, maxC.y);
+					bbMaxCorner.z = std::max(bbMaxCorner.z, maxC.z);
 				}
 			}
 		}
 		for (size_t j=0; j<meshCount; ++j)
 		{
 			CCVector3d minC, maxC;
-			if (meshes[j]->getGlobalBB(minC,maxC))
+			if (meshes[j]->getGlobalBB(minC, maxC))
 			{
 				//update global BB
 				if (firstEntity)
@@ -553,12 +554,12 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 				}
 				else
 				{
-					bbMinCorner.x = std::min(bbMinCorner.x,minC.x);
-					bbMinCorner.y = std::min(bbMinCorner.y,minC.y);
-					bbMinCorner.z = std::min(bbMinCorner.z,minC.z);
-					bbMaxCorner.x = std::max(bbMaxCorner.x,maxC.x);
-					bbMaxCorner.y = std::max(bbMaxCorner.y,maxC.y);
-					bbMaxCorner.z = std::max(bbMaxCorner.z,maxC.z);
+					bbMinCorner.x = std::min(bbMinCorner.x, minC.x);
+					bbMinCorner.y = std::min(bbMinCorner.y, minC.y);
+					bbMinCorner.z = std::min(bbMinCorner.z, minC.z);
+					bbMaxCorner.x = std::max(bbMaxCorner.x, maxC.x);
+					bbMaxCorner.y = std::max(bbMaxCorner.y, maxC.y);
+					bbMaxCorner.z = std::max(bbMaxCorner.z, maxC.z);
 				}
 			}
 		}
@@ -585,23 +586,23 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 
 		//add dimensions
 		dw->dxfString(9, "$INSBASE");
-		dw->dxfReal(10,0.0);
-		dw->dxfReal(20,0.0);
-		dw->dxfReal(30,0.0);
+		dw->dxfReal(10, 0.0);
+		dw->dxfReal(20, 0.0);
+		dw->dxfReal(30, 0.0);
 		dw->dxfString(9, "$EXTMIN");
-		dw->dxfReal(10,bbMinCorner.x-pageMargin);
-		dw->dxfReal(20,bbMinCorner.y-pageMargin);
-		dw->dxfReal(30,bbMinCorner.z-pageMargin);
+		dw->dxfReal(10, bbMinCorner.x - pageMargin);
+		dw->dxfReal(20, bbMinCorner.y - pageMargin);
+		dw->dxfReal(30, bbMinCorner.z - pageMargin);
 		dw->dxfString(9, "$EXTMAX");
-		dw->dxfReal(10,bbMaxCorner.x+pageMargin);
-		dw->dxfReal(20,bbMaxCorner.y+pageMargin);
-		dw->dxfReal(30,bbMaxCorner.z+pageMargin);
+		dw->dxfReal(10, bbMaxCorner.x + pageMargin);
+		dw->dxfReal(20, bbMaxCorner.y + pageMargin);
+		dw->dxfReal(30, bbMaxCorner.z + pageMargin);
 		dw->dxfString(9, "$LIMMIN");
-		dw->dxfReal(10,bbMinCorner.x-pageMargin);
-		dw->dxfReal(20,bbMinCorner.y-pageMargin);
+		dw->dxfReal(10, bbMinCorner.x - pageMargin);
+		dw->dxfReal(20, bbMinCorner.y - pageMargin);
 		dw->dxfString(9, "$LIMMAX");
-		dw->dxfReal(10,bbMaxCorner.x+pageMargin);
-		dw->dxfReal(20,bbMaxCorner.y+pageMargin);
+		dw->dxfReal(10, bbMaxCorner.x + pageMargin);
+		dw->dxfReal(20, bbMaxCorner.y + pageMargin);
 
 		//close header
 		dw->sectionEnd();
@@ -617,28 +618,6 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 			dxf.writeLineType(*dw, DL_LineTypeData("BYBLOCK", 0));
 			dxf.writeLineType(*dw, DL_LineTypeData("BYLAYER", 0));
 			dxf.writeLineType(*dw, DL_LineTypeData("CONTINUOUS", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("ACAD_ISO02W100", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("ACAD_ISO03W100", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("ACAD_ISO04W100", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("ACAD_ISO05W100", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("BORDER", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("BORDER2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("BORDERX2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("CENTER", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("CENTER2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("CENTERX2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DASHDOT", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DASHDOT2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DASHDOTX2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DASHED", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DASHED2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DASHEDX2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DIVIDE", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DIVIDE2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DIVIDEX2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DOT", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DOT2", 0));
-			dxf.writeLineType(*dw, DL_LineTypeData("DOTX2", 0));
 			dw->tableEnd();
 		}
 
@@ -662,7 +641,7 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 				//default layer name
 				//TODO: would be better to use the polyline name!
 				//but it can't be longer than 31 characters (R14 limit)
-				QString layerName = QString("POLYLINE_%1").arg(i+1,3,10,QChar('0'));
+				QString layerName = QString("POLYLINE_%1").arg(i + 1, 3, 10, QChar('0'));
 
 				polyLayerNames << layerName;
 				dxf.writeLayer(*dw, 
@@ -680,7 +659,7 @@ CC_FILE_ERROR DxfFilter::saveToFile(ccHObject* root, QString filename, SaveParam
 				//default layer name
 				//TODO: would be better to use the mesh name!
 				//but it can't be longer than 31 characters (R14 limit)
-				QString layerName = QString("MESH_%1").arg(j+1,3,10,QChar('0'));
+				QString layerName = QString("MESH_%1").arg(j + 1, 3, 10, QChar('0'));
 
 				meshLayerNames << layerName;
 				dxf.writeLayer(*dw, 

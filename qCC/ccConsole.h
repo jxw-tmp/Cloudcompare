@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -17,10 +17,6 @@
 
 #ifndef CC_CONSOLE_HEADER
 #define CC_CONSOLE_HEADER
-
-//system
-#include <stdio.h>
-#include <string.h>
 
 //qCC_db
 #include <ccLog.h>
@@ -42,7 +38,6 @@ class QTextStream;
 //! Console
 class ccConsole : public QObject, public ccLog
 {
-
 	Q_OBJECT
 
 public:
@@ -75,6 +70,12 @@ public:
 	//! Sets log file
 	bool setLogFile(QString filename);
 
+	//! Whether to show Qt messages (qDebug / qWarning / etc.) in Console
+	static void EnableQtMessages(bool state);
+
+	//! Returns whether to show Qt messages (qDebug / qWarning / etc.) in Console or not
+	static bool QtMessagesEnabled() { return s_showQtMessagesInConsole; }
+
 public slots:
 
 	//! Refreshes console (display all messages still in queue)
@@ -88,7 +89,7 @@ protected:
 	ccConsole();
 
 	//inherited from ccLog
-	virtual void displayMessage(const QString& message, int level);
+	virtual void logMessage(const QString& message, int level);
 
 	//! Associated text display widget
 	QListWidget* m_textDisplay;
@@ -116,6 +117,8 @@ protected:
 	//! Log file stream
 	QTextStream* m_logStream;
 
+	//! Whether to show Qt messages (qDebug / qWarning / etc.) in Console
+	static bool s_showQtMessagesInConsole;
 };
 
 #endif

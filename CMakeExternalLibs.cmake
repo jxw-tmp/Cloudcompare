@@ -1,96 +1,74 @@
 # ------------------------------------------------------------------------------
 # Qt
 # ------------------------------------------------------------------------------
-option( USE_QT5 "Check to use Qt5 instead of Qt4" OFF )
-if ( USE_QT5 )
+## we will use cmake automoc feature
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-	cmake_minimum_required(VERSION 2.8.8)
-
-	set( QT5_ROOT_PATH CACHE PATH "Qt5 root directory (i.e. where the 'bin' folder lies)" )
-	if ( QT5_ROOT_PATH )
-	
-		list( APPEND CMAKE_PREFIX_PATH ${QT5_ROOT_PATH} )
-	
-		#see http://www.kdab.com/using-cmake-with-qt-5/
-		# Find includes in corresponding build directories
-		set(CMAKE_INCLUDE_CURRENT_DIR ON)
-		# Instruct CMake to run moc automatically when needed.
-		set(CMAKE_AUTOMOC ON)
-		
-		if ( MSVC )
-			# Where to find opengl libraries
-			set(WINDOWS_OPENGL_LIBS "C:\\Program Files (x86)\\Windows Kits\\8.0\\Lib\\win8\\um\\x64" CACHE PATH "WindowsSDK libraries" )
-			list( APPEND CMAKE_PREFIX_PATH ${WINDOWS_OPENGL_LIBS} )
-		endif()
-
-		# Find the Qt5 libraries
-		#set( DESIRED_QT_VERSION 5 )
-		find_package(Qt5OpenGL REQUIRED)
-		find_package(Qt5Widgets REQUIRED)
-		find_package(Qt5Core REQUIRED)
-		find_package(Qt5Gui REQUIRED)
-		find_package(Qt5Concurrent REQUIRED)
-		
-	else()
-		message(SEND_ERROR "Please specify the Qt5 installation root directory")
-	endif()
-
-	list( APPEND EXTERNAL_LIBS_INCLUDE_DIR ${Qt5OpenGL_INCLUDE_DIRS} ${Qt5Widgets_INCLUDE_DIRS} ${Qt5Core_INCLUDE_DIRS} ${Qt5Gui_INCLUDE_DIRS} ${Qt5Concurrent_INCLUDE_DIRS} )
-	#list( APPEND EXTERNAL_LIBS_LIBRARIES ${Qt5OpenGL_LIBRARIES} ${Qt5Widgets_LIBRARIES} ${Qt5Core_LIBRARIES} ${Qt5Gui_LIBRARIES} ${Qt5Concurrent_LIBRARIES} )
-
-	#for executables only!
-	#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5OpenGL_EXECUTABLE_COMPILE_FLAGS}")
-	#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
-	#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Core_EXECUTABLE_COMPILE_FLAGS}")
-	#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Gui_EXECUTABLE_COMPILE_FLAGS}")
-
-	set( QT_BINARY_DIR ${QT5_ROOT_PATH}/bin )
-
-else()
-
-	set( DESIRED_QT_VERSION 4 )
-	set (QT_BINARY_DIR "") #to force CMake to update QT_BINARY_DIR!
-	if ( MSVC )
-		#We need QtMain to use 'WIN32' mode (/subsystem:windows) with MSVC
-		find_package( Qt4 ${QT_VERSION} COMPONENTS QtMain QtCore QtGui QtOpenGL REQUIRED )
-	else()
-		find_package( Qt4 ${QT_VERSION} COMPONENTS QtCore QtGui QtOpenGL REQUIRED )
-	endif()
-	if( NOT QT_FOUND )
-		message( SEND_ERROR "Qt required, but not found with 'find_package()'" )
-	else()
-		include( ${QT_USE_FILE} )
-	endif()
-	
-	list( APPEND EXTERNAL_LIBS_INCLUDE_DIR ${QT_INCLUDE_DIR} )
-	list( APPEND EXTERNAL_LIBS_LIBRARIES ${QT_LIBRARIES} )
-	
-	#message(${QT_BINARY_DIR})
-
+set( QT5_ROOT_PATH CACHE PATH "Qt5 root directory (i.e. where the 'bin' folder lies)" )
+if ( QT5_ROOT_PATH )
+	list( APPEND CMAKE_PREFIX_PATH ${QT5_ROOT_PATH} )
 endif()
+
+# find qt5 components
+# find_package(Qt5 COMPONENTS OpenGL Widgets Core Gui PrintSupport Concurrent REQUIRED)
+find_package(Qt5Widgets)
+find_package(Qt5Core)
+find_package(Qt5Gui)
+find_package(Qt5PrintSupport)
+find_package(Qt5Concurrent)
+find_package(Qt5OpenGL)
+find_package(Qt5OpenGLExtensions)
+
+# in the case no Qt5Config.cmake file could be found, cmake will explicitly ask the user for the QT5_DIR containing it!
+# thus no need to keep additional variables and checks
+
+# Starting with the QtCore lib, find the bin and root directories
+get_target_property(QT5_LIB_LOCATION Qt5::Core LOCATION_${CMAKE_BUILD_TYPE})
+get_filename_component(QT_BINARY_DIR ${QT5_LIB_LOCATION} DIRECTORY)
+
+# Apple uses frameworks - move up until we get to the base directory to set the bin directory properly
+if ( APPLE )
+	get_filename_component(QT_BINARY_DIR ${QT_BINARY_DIR} DIRECTORY)
+	get_filename_component(QT_BINARY_DIR ${QT_BINARY_DIR} DIRECTORY)
+	set(QT_BINARY_DIR "${QT_BINARY_DIR}/bin")	
+
+	set( MACDEPLOYQT "${QT_BINARY_DIR}/macdeployqt" )
+endif()
+
+# set QT5_ROOT_PATH if it wasn't set by the user
+if ( NOT QT5_ROOT_PATH )
+	get_filename_component(QT5_ROOT_PATH ${QT_BINARY_DIR} DIRECTORY)
+endif()
+
+include_directories(${Qt5OpenGL_INCLUDE_DIRS}
+                    ${Qt5Widgets_INCLUDE_DIRS}
+                    ${Qt5Core_INCLUDE_DIRS}
+                    ${Qt5Gui_INCLUDE_DIRS}
+                    ${Qt5Concurrent_INCLUDE_DIRS}
+                    ${Qt5PrintSupport_INCLUDE_DIRS}
+					)
+
+# turn on QStringBuilder for more efficient string construction
+#	see https://doc.qt.io/qt-5/qstring.html#more-efficient-string-construction
+add_definitions( -DQT_USE_QSTRINGBUILDER )
+				
 
 # ------------------------------------------------------------------------------
 # OpenGL
 # ------------------------------------------------------------------------------
-
-find_package( OpenGL REQUIRED )
-if( NOT OPENGL_FOUND )
-    message( SEND_ERROR "OpenGL required, but not found with 'find_package()'" )
+if ( MSVC )
+	# Where to find OpenGL libraries
+	set(WINDOWS_OPENGL_LIBS "C:\\Program Files (x86)\\Windows Kits\\8.0\\Lib\\win8\\um\\x64" CACHE PATH "WindowsSDK libraries" )
+	list( APPEND CMAKE_PREFIX_PATH ${WINDOWS_OPENGL_LIBS} )
 endif()
-
+				
 # ------------------------------------------------------------------------------
-# CUDA
+# OpenMP
 # ------------------------------------------------------------------------------
-#if( USE_CUDA )
-#    find_package( CUDA REQUIRED )
-#    if( NOT CUDA_FOUND )
-#        message( SEND_ERROR "CUDA required, but not found with 'find_package()'" )
-#    endif()
-#endif()
-
-# ------------------------------------------------------------------------------
-# Global variables
-# ------------------------------------------------------------------------------
-
-list( APPEND EXTERNAL_LIBS_INCLUDE_DIR ${QT_INCLUDE_DIR} ${OPENGL_INCLUDE_DIR}  )
-list( APPEND EXTERNAL_LIBS_LIBRARIES ${QT_LIBRARIES} ${OPENGL_LIBRARIES} )
+find_package(OpenMP QUIET)
+if (OPENMP_FOUND)
+	message("OpenMP found")
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()

@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -24,6 +25,57 @@
 
 //system
 #include <math.h> //for sqrt, fabs
+
+//! 4-Tuple structure (templated version)
+template <class Type> class Tuple4Tpl
+{
+public:
+	
+	// The 4 tuple values as a union (array/separate values)
+	union
+	{
+		struct
+		{
+			Type x,y,z,w;
+		};
+		Type u[4];
+	};
+
+	//! Default constructor
+	/** Inits tuple to (0,0,0,0).
+	**/
+	inline Tuple4Tpl() : x(0),y(0),z(0),w(0) {}
+
+	//! Constructor from a triplet of values
+	/** Inits typle to (a,b,c).
+	**/
+	inline Tuple4Tpl(Type a, Type b, Type c, Type d) : x(a), y(b), z(c), w(d) {}
+
+	//! Constructor from an array of 4 elements
+	inline explicit Tuple4Tpl(const Type p[]) : x(p[0]), y(p[1]), z(p[2]), w(p[3]) {}
+	
+	//! Copy constructor
+	inline Tuple4Tpl(const Tuple4Tpl& v) : x(v.x), y(v.y), z(v.z), w(v.w) {}
+
+	//! Inverse operator
+	inline Tuple4Tpl operator - () const { Tuple4Tpl V(-x,-y,-z, -w); return V; }
+	//! In-place addition operator
+	inline Tuple4Tpl& operator += (const Tuple4Tpl& v) { x+=v.x; y+=v.y; z+=v.z; w+=v.w; return *this; }
+	//! In-place subtraction operator
+	inline Tuple4Tpl& operator -= (const Tuple4Tpl& v) { x-=v.x; y-=v.y; z-=v.z; w-=v.w; return *this; }
+	//! In-place multiplication (by a scalar) operator
+	inline Tuple4Tpl& operator *= (Type v) { x*=v; y*=v; z*=v; w*=v; return *this; }
+	//! In-place division (by a scalar) operator
+	inline Tuple4Tpl& operator /= (Type v) { x/=v; y/=v; z/=v; w/=v; return *this; }
+	//! Addition operator
+	inline Tuple4Tpl operator + (const Tuple4Tpl& v) const { return Tuple4Tpl(x+v.x, y+v.y, z+v.z, w+v.w); }
+	//! Subtraction operator
+	inline Tuple4Tpl operator - (const Tuple4Tpl& v) const { return Tuple4Tpl(x-v.x, y-v.y, z-v.z, w-v.w); }
+	//! Multiplication operator
+	inline Tuple4Tpl operator * (Type s) const { return Tuple4Tpl(x*s, y*s, z*s, w*s); }
+	//! Division operator
+	inline Tuple4Tpl operator / (Type s) const { return Tuple4Tpl(x/s, y/s, z/s, w/s); }
+};
 
 //! 3-Tuple structure (templated version)
 template <class Type> class Tuple3Tpl
@@ -60,7 +112,7 @@ public:
 	inline Tuple3Tpl operator - () const { Tuple3Tpl V(-x,-y,-z); return V; }
 	//! In-place addition operator
 	inline Tuple3Tpl& operator += (const Tuple3Tpl& v) { x+=v.x; y+=v.y; z+=v.z; return *this; }
-	//! In-place substraction operator
+	//! In-place subtraction operator
 	inline Tuple3Tpl& operator -= (const Tuple3Tpl& v) { x-=v.x; y-=v.y; z-=v.z; return *this; }
 	//! In-place multiplication (by a scalar) operator
 	inline Tuple3Tpl& operator *= (Type v) { x*=v; y*=v; z*=v; return *this; }
@@ -68,7 +120,7 @@ public:
 	inline Tuple3Tpl& operator /= (Type v) { x/=v; y/=v; z/=v; return *this; }
 	//! Addition operator
 	inline Tuple3Tpl operator + (const Tuple3Tpl& v) const { return Tuple3Tpl(x+v.x, y+v.y, z+v.z); }
-	//! Substraction operator
+	//! Subtraction operator
 	inline Tuple3Tpl operator - (const Tuple3Tpl& v) const { return Tuple3Tpl(x-v.x, y-v.y, z-v.z); }
 	//! Multiplication operator
 	inline Tuple3Tpl operator * (Type s) const { return Tuple3Tpl(x*s, y*s, z*s); }
@@ -141,7 +193,7 @@ public:
 	inline Vector3Tpl operator - () const { Vector3Tpl V(-x,-y,-z); return V; }
 	//! In-place addition operator
 	inline Vector3Tpl& operator += (const Vector3Tpl& v) { x+=v.x; y+=v.y; z+=v.z; return *this; }
-	//! In-place substraction operator
+	//! In-place subtraction operator
 	inline Vector3Tpl& operator -= (const Vector3Tpl& v) { x-=v.x; y-=v.y; z-=v.z; return *this; }
 	//! In-place multiplication (by a scalar) operator
 	inline Vector3Tpl& operator *= (Type v) { x*=v; y*=v; z*=v; return *this; }
@@ -149,7 +201,7 @@ public:
 	inline Vector3Tpl& operator /= (Type v) { x/=v; y/=v; z/=v; return *this; }
 	//! Addition operator
 	inline Vector3Tpl operator + (const Vector3Tpl& v) const { return Vector3Tpl(x+v.x, y+v.y, z+v.z); }
-	//! Substraction operator
+	//! Subtraction operator
 	inline Vector3Tpl operator - (const Vector3Tpl& v) const { return Vector3Tpl(x-v.x, y-v.y, z-v.z); }
 	//! Multiplication operator
 	inline Vector3Tpl operator * (Type s) const { return Vector3Tpl(x*s, y*s, z*s); }
@@ -176,6 +228,7 @@ public:
 	static inline void vset(Type p[], Type s) {p[0]=p[1]=p[2]=s;}
 	static inline void vset(Type p[], Type x, Type y, Type z) {p[0]=x; p[1]=y; p[2]=z;}
 	static inline void vadd(const Type p[], const Type q[], Type r[]) {r[0]=p[0]+q[0]; r[1]=p[1]+q[1]; r[2]=p[2]+q[2];}
+	// note misspelling: should be vsubtract
 	static inline void vsubstract(const Type p[], const Type q[], Type r[]) {r[0]=p[0]-q[0]; r[1]=p[1]-q[1]; r[2]=p[2]-q[2];}
 	static inline void vcombination(Type a, const Type p[], Type b, const Type q[], Type r[]) {r[0]=(a*p[0])+(b*q[0]); r[1]=(a*p[1])+(b*q[1]); r[2]=(a*p[2])+(b*q[2]);}
 	static inline void vcombination(const Type p[], Type b, const Type q[], Type r[]) {r[0]=p[0]+(b*q[0]); r[1]=p[1]+(b*q[1]); r[2]=p[2]+(b*q[2]);}
@@ -257,7 +310,7 @@ public:
 	inline Vector2Tpl& operator - () {x=-x; y=-y; return *this;}
 	//! In-place addition operator
 	inline Vector2Tpl& operator += (const Vector2Tpl& v) {x+=v.x; y+=v.y; return *this;}
-	//! In-place substraction operator
+	//! In-place subtraction operator
 	inline Vector2Tpl& operator -= (const Vector2Tpl& v) {x-=v.x; y-=v.y; return *this;}
 	//! In-place multiplication (by a scalar) operator
 	inline Vector2Tpl& operator *= (Type v) {x*=v; y*=v; return *this;}
@@ -282,6 +335,8 @@ public:
 //! Default 3D Vector
 typedef Vector3Tpl<PointCoordinateType> CCVector3;
 
+//! Double 3D Vector
+typedef Vector3Tpl<float> CCVector3f;
 //! Double 3D Vector
 typedef Vector3Tpl<double> CCVector3d;
 

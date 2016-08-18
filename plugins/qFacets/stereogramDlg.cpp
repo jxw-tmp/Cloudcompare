@@ -4,14 +4,14 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#                           COPYRIGHT: BRGM                              #
+//#                      COPYRIGHT: Thomas Dewez, BRGM                     #
 //#                                                                        #
 //##########################################################################
 
@@ -29,9 +29,6 @@
 #include <ccMainAppInterface.h>
 
 //qCC_db
-#include <ccHObject.h>
-#include <ccFacet.h>
-#include <ccNormalVectors.h>
 #include <ccColorScalesManager.h>
 #include <ccColorScaleSelector.h>
 #include <ccColorScaleEditorDlg.h>
@@ -84,7 +81,7 @@ StereogramWidget::StereogramWidget(QWidget *parent)
 	, m_meanDipDir_deg(-1.0)
 	, m_meanDip_deg(-1.0)
 	, m_densityColorScale(0)
-	, m_densityColorScaleSteps(std::min<unsigned>(256,ccColorScale::MAX_STEPS))
+	, m_densityColorScaleSteps(ccColorScale::MAX_STEPS < 256 ? ccColorScale::MAX_STEPS : 256) //DGM: we can't pass a constant initializer (MAX_STEPS) by reference
 	, m_ticksFreq(3)
 	, m_showHSVRing(false)
 	, m_trackMouseClick(false)
@@ -122,8 +119,8 @@ bool StereogramWidget::init(double angularStep_deg,
 		return false;
 
 	ccProgressDialog pDlg(true);
-	pDlg.setMethodTitle("Stereogram");
-	pDlg.setInfo("Preparing polar display...");
+	pDlg.setMethodTitle(QObject::tr("Stereogram"));
+	pDlg.setInfo(QObject::tr("Preparing polar display..."));
 	pDlg.start();
 	QApplication::processEvents();
 

@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -18,18 +18,14 @@
 #ifndef CC_FILE_IO_FILTER_HEADER
 #define CC_FILE_IO_FILTER_HEADER
 
-//Qt
-#include <QString>
-#include <QStringList>
-#include <QSharedPointer>
-
 //qCC_db
 #include <ccHObject.h>
 #include <ccHObjectCaster.h>
 
 //Local
-#include "qCC_io.h"
 #include "ccGlobalShiftManager.h"
+
+class QWidget;
 
 //! Typical I/O filter errors
 enum CC_FILE_ERROR {CC_FERR_NO_ERROR,
@@ -73,6 +69,7 @@ public: //initialization
 			, coordinatesShiftEnabled(0)
 			, coordinatesShift(0)
 			, autoComputeNormals(false)
+			, parentWidget(0)
 		{}
 
 		//! How to handle big coordinates
@@ -85,17 +82,23 @@ public: //initialization
 		CCVector3d* coordinatesShift;
 		//! Whether normals should be computed at loading time (if possible - e.g. for gridded clouds) or not
 		bool autoComputeNormals;
+		//! Parent widget (if any)
+		QWidget* parentWidget;
 	};
 
 	//! Generic saving parameters
 	struct SaveParameters
 	{
 		//! Default constructor
-		SaveParameters() : alwaysDisplaySaveDialog(true)
+		SaveParameters()
+			: alwaysDisplaySaveDialog(true)
+			, parentWidget(0)
 		{}
 
 		//! Wether to always display a dialog (if any), even if automatic guess is possible
 		bool alwaysDisplaySaveDialog;
+		//! Parent widget (if any)
+		QWidget* parentWidget;
 	};
 
 	//! Shared type
@@ -127,6 +130,7 @@ public: //public interface (to be reimplemented by each I/O filter)
 	/** This method must be implemented by children classes.
 		\param entity entity (or group of) to save
 		\param filename filename
+		\param parameters generic saving parameters
 		\return error
 	**/
 	virtual CC_FILE_ERROR saveToFile(	ccHObject* entity,
@@ -177,16 +181,19 @@ public: //static methods
 	**/
 	QCC_IO_LIB_API static ccHObject* LoadFromFile(	const QString& filename,
 													LoadParameters& parameters,
-													Shared filter);
+													Shared filter,
+													CC_FILE_ERROR& result);
 
 	//! Loads one or more entities from a file with known type
 	/** Shortcut to the other version of FileIOFilter::LoadFromFile
+		\param filename filename
 		\param parameters generic loading parameters
 		\param fileFilter input filter 'file filter' (if empty, the best I/O filter will be guessed from the file extension)
 		\return loaded entities (or 0 if an error occurred)
 	**/
 	QCC_IO_LIB_API static ccHObject* LoadFromFile(	const QString& filename,
 													LoadParameters& parameters,
+													CC_FILE_ERROR& result,
 													QString fileFilter = QString());
 
 	//! Saves an entity (or a group of) to a specific file thanks to a given filter

@@ -4,26 +4,24 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#                           COPYRIGHT: BRGM                              #
+//#                      COPYRIGHT: Thomas Dewez, BRGM                     #
 //#                                                                        #
 //##########################################################################
 
 #include "kdTreeForFacetExtraction.h"
 
-//qCC_db
-#include <ccGenericPointCloud.h>
-#include <ccPointCloud.h>
-
 //CCLib
-#include <Neighbourhood.h>
-#include <GenericProgressCallback.h>
+#include <SortAlgo.h>
+
+//qCC_db
+#include <ccPointCloud.h>
 
 //Qt
 #include <QApplication>
@@ -83,20 +81,22 @@ bool ccKdTreeForFacetExtraction::FuseCells(	ccKdTree* kdTree,
 		return false;
 
 	//progress notification
-	CCLib::NormalizedProgress* nProgress = 0;
+	CCLib::NormalizedProgress nProgress(progressCb, static_cast<unsigned>(leaves.size()));
 	if (progressCb)
 	{
-		progressCb->reset();
-		progressCb->setMethodTitle("Fuse Kd-tree cells");
-		progressCb->setInfo(qPrintable(QString("Cells: %1\nMax error: %2").arg(leaves.size()).arg(maxError)));
-		nProgress = new CCLib::NormalizedProgress(progressCb,(unsigned)leaves.size());
+		progressCb->update(0);
+		if (progressCb->textCanBeEdited())
+		{
+			progressCb->setMethodTitle("Fuse Kd-tree cells");
+			progressCb->setInfo(qPrintable(QString("Cells: %1\nMax error: %2").arg(leaves.size()).arg(maxError)));
+		}
 		progressCb->start();
 	}
 
 	ccPointCloud* pc = static_cast<ccPointCloud*>(associatedGenericCloud);
 
 	//sort cells based on their population size (we start by the biggest ones)
-	std::sort(leaves.begin(),leaves.end(),DescendingLeafSizeComparison);
+	SortAlgo(leaves.begin(), leaves.end(), DescendingLeafSizeComparison);
 
 	//set all 'userData' to -1 (i.e. unfused cells)
 	{
@@ -125,7 +125,7 @@ bool ccKdTreeForFacetExtraction::FuseCells(	ccKdTree* kdTree,
 			//already fused?
 			if (currentCell->userData != -1)
 			{
-				if (nProgress && !nProgress->oneStep()) //process canceled by user
+				if (progressCb && !nProgress.oneStep()) //process canceled by user
 				{
 					cancelled = true;
 					break;
@@ -151,7 +151,7 @@ bool ccKdTreeForFacetExtraction::FuseCells(	ccKdTree* kdTree,
 			ccKdTree::LeafVector cellsToTest;
 			cellsToTest.push_back(currentCell);
 
-			if (nProgress && !nProgress->oneStep()) //process canceled by user
+			if (progressCb && !nProgress.oneStep()) //process canceled by user
 			{
 				cancelled = true;
 				break;
@@ -321,7 +321,7 @@ bool ccKdTreeForFacetExtraction::FuseCells(	ccKdTree* kdTree,
 						//we will test this cell's neighbors as well
 						cellsToTest.push_back(bestIt->leaf);
 
-						if (nProgress && !nProgress->oneStep()) //process canceled by user
+						if (progressCb && !nProgress.oneStep()) //process canceled by user
 						{
 							//premature end!
 							candidates.clear();

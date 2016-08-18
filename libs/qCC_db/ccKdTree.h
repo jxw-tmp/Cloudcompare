@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -22,11 +22,10 @@
 #include <TrueKdTree.h>
 
 //Local
-#include "qCC_db.h"
 #include "ccHObject.h"
 
 //System
-#include <set>
+#include <unordered_set>
 
 class ccGenericPointCloud;
 
@@ -58,10 +57,10 @@ public:
 	void translateBoundingBox(const CCVector3& T);
 
 	//! Returns class ID
-	virtual CC_CLASS_ENUM getClassID() const { return CC_TYPES::POINT_KDTREE; }
+	virtual CC_CLASS_ENUM getClassID() const override { return CC_TYPES::POINT_KDTREE; }
 
 	//Inherited from ccHObject
-	virtual ccBBox getOwnBB(bool withGLFeatures = false);
+	virtual ccBBox getOwnBB(bool withGLFeatures = false) override;
 
 	//! Flag points with cell index (as a scalar field)
 	bool convertCellIndexToSF();
@@ -72,7 +71,7 @@ public:
 	ccBBox getCellBBox(BaseNode* node) const;
 
 	//! A set of leaves
-	typedef std::set<Leaf*> LeafSet;
+	typedef std::unordered_set<Leaf*> LeafSet;
 
 	//! Returns the neighbor leaves around a given cell
 	bool getNeighborLeaves(BaseNode* cell, ccKdTree::LeafSet& neighbors, const int* userDataFilter = 0);
@@ -83,7 +82,7 @@ public:
 protected:
 
 	//Inherited from ccHObject
-	void drawMeOnly(CC_DRAW_CONTEXT& context);
+	virtual void drawMeOnly(CC_DRAW_CONTEXT& context) override;
 
 	//! Associated cloud
 	ccGenericPointCloud* m_associatedGenericCloud;

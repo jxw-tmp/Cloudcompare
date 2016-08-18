@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -30,6 +31,7 @@
 
 //system
 #include <assert.h>
+#include <random>
 
 using namespace CCLib;
 
@@ -163,7 +165,9 @@ bool GeometricalAnalysisTools::computeCellCurvatureAtLevel(	const DgmOctree::oct
 		cell.points->setPointScalarValue(i,curv);
 
 		if (nProgress && !nProgress->oneStep())
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -265,7 +269,9 @@ bool GeometricalAnalysisTools::flagDuplicatePointsInACellAtLevel(	const DgmOctre
 		}
 
 		if (nProgress && !nProgress->oneStep())
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -389,7 +395,9 @@ bool GeometricalAnalysisTools::computeApproxPointsDensityInACellAtLevel(const Dg
 		}
 
 		if (nProgress && !nProgress->oneStep())
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -501,7 +509,9 @@ bool GeometricalAnalysisTools::computePointsDensityInACellAtLevel(	const DgmOctr
 		cell.points->setPointScalarValue(i,density);
 
 		if (nProgress && !nProgress->oneStep())
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -612,7 +622,9 @@ bool GeometricalAnalysisTools::computePointsRoughnessInACellAtLevel(const DgmOct
 		cell.points->setPointScalarValue(i,d);
 
 		if (nProgress && !nProgress->oneStep())
+		{
 			return false;
+		}
 	}
 
 	return true;
@@ -827,7 +839,6 @@ bool GeometricalAnalysisTools::refineSphereLS(	GenericIndexedCloudPersist* cloud
 	}
 	
 	CCVector3d c = CCVector3d::fromArray(center.u);
-	double r = radius;
 
 	unsigned count = cloud->size();
 
@@ -869,7 +880,7 @@ bool GeometricalAnalysisTools::refineSphereLS(	GenericIndexedCloudPersist* cloud
 		CCVector3d c0 = c;
 		//deduce new center
 		c = G - derivatives * meanNorm;
-		r = meanNorm;
+		double r = meanNorm;
 
 		double shift = (c-c0).norm();
 		double relativeShift = shift/r;
@@ -917,19 +928,24 @@ bool GeometricalAnalysisTools::detectSphereRobust(	GenericIndexedCloudPersist* c
 		m = static_cast<unsigned>( log(1.0-confidence) / log(1.0-pow(1.0-outliersRatio,static_cast<double>(p))) );
 
 	//for progress notification
-	NormalizedProgress* nProgress = 0;
+	NormalizedProgress nProgress(progressCb, m);
 	if (progressCb)
 	{
-		nProgress = new NormalizedProgress(progressCb,m);
-		char buffer[64];
-		sprintf(buffer,"Least Median of Squares samples: %u",m);
-		progressCb->reset();
-		progressCb->setInfo(buffer);
-		progressCb->setMethodTitle("Detect sphere");
+		if (progressCb->textCanBeEdited())
+		{
+			char buffer[64];
+			sprintf(buffer, "Least Median of Squares samples: %u", m);
+			progressCb->setInfo(buffer);
+			progressCb->setMethodTitle("Detect sphere");
+		}
+		progressCb->update(0);
 		progressCb->start();
 	}
 
 	//now we are going to randomly extract a subset of 4 points and test the resulting sphere each time
+	std::random_device rd;   // non-deterministic generator
+	std::mt19937 gen(rd());  // to seed mersenne twister.
+	std::uniform_int_distribution<unsigned> dist(0, n - 1);
 	unsigned sampleCount = 0;
 	unsigned attempts = 0;
 	double minError = -1.0;
@@ -942,7 +958,7 @@ bool GeometricalAnalysisTools::detectSphereRobust(	GenericIndexedCloudPersist* c
 			bool isOK = false;
 			while (!isOK)
 			{
-				indexes[j] = static_cast<unsigned>((n-1) * (static_cast<double>(rand()) / RAND_MAX));
+				indexes[j] = dist(gen);
 				isOK = true;
 				for (unsigned k=0; k<j && isOK; ++k)
 					if (indexes[j] == indexes[k])
@@ -967,7 +983,7 @@ bool GeometricalAnalysisTools::detectSphereRobust(	GenericIndexedCloudPersist* c
 			PointCoordinateType error = (*cloud->getPoint(i) - thisCenter).norm() - thisRadius;
 			values[i] = error*error;
 		}
-		std::sort(values.begin(),values.end());
+		std::sort(values.begin(), values.end());
 
 		//the error is the median of the squared residuals
 		double error = values[n/2];
@@ -982,10 +998,9 @@ bool GeometricalAnalysisTools::detectSphereRobust(	GenericIndexedCloudPersist* c
 
 		++sampleCount;
 
-		if (nProgress && !nProgress->oneStep())
+		if (progressCb && !nProgress.oneStep())
 		{
 			//progress canceled by the user
-			delete nProgress;
 			return false;
 		}
 	}
@@ -993,8 +1008,6 @@ bool GeometricalAnalysisTools::detectSphereRobust(	GenericIndexedCloudPersist* c
 	//too many failures?!
 	if (sampleCount < m)
 	{
-		if (nProgress)
-			delete nProgress;
 		return false;
 	}
 	
@@ -1046,12 +1059,6 @@ bool GeometricalAnalysisTools::detectSphereRobust(	GenericIndexedCloudPersist* c
 		rms = sqrt(residuals/n);
 	}
 	
-	if (nProgress)
-	{
-		delete nProgress;
-		nProgress = 0;
-	}
-
 	return true;
 }
 

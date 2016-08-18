@@ -4,14 +4,14 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#                           COPYRIGHT: BRGM                              #
+//#                      COPYRIGHT: Thomas Dewez, BRGM                     #
 //#                                                                        #
 //##########################################################################
 
@@ -24,7 +24,6 @@
 
 //qCC_db
 #include <ccFacet.h>
-#include <ccNormalVectors.h>
 
 static const QString s_OriFamilyKey = "orientation.family.index";
 static const QString s_OriFamilyNameKey = "orientation.family.name";
@@ -87,12 +86,12 @@ public:
 		CCVector3 N = facet->getNormal();
 
 		PointCoordinateType dipDir = 0, dip = 0;
-		ccNormalVectors::ConvertNormalToDipAndDipDir(N,dip,dipDir);
+		ccNormalVectors::ConvertNormalToDipAndDipDir(N, dip, dipDir);
 
-		iDip = static_cast<unsigned>(floor(static_cast<double>(dip)/angularStep_deg));
+		iDip = static_cast<unsigned>(floor(dip / angularStep_deg));
 		if (iDip == dSteps)
 			iDip--;
-		iDipDir = static_cast<unsigned>(floor(static_cast<double>(dipDir)/angularStep_deg));
+		iDipDir = static_cast<unsigned>(floor(dipDir / angularStep_deg));
 		if (iDipDir == ddSteps)
 			iDipDir--;
 	}
@@ -109,33 +108,33 @@ public:
 	}
 
 	//! Subdivides a set of facets with similar orientation
-	static bool ProcessFamiliy(ccHObject* parent,
-						FacetSet& family,
-						unsigned familyIndex,
-						unsigned iDip,
-						unsigned iDipDir,
-						double angularStep_deg,
-						double maxDist)
+	static bool ProcessFamiliy(	ccHObject* parent,
+								FacetSet& family,
+								unsigned familyIndex,
+								unsigned iDip,
+								unsigned iDipDir,
+								double angularStep_deg,
+								double maxDist)
 	{
 		size_t count = family.size();
 		if (count == 0)
 			return true;
 
-		double dip = (static_cast<double>(iDip) + 0.5) * angularStep_deg;
-		double dipDir = (static_cast<double>(iDipDir) + 0.5) * angularStep_deg;
+		double dip = (iDip + 0.5) * angularStep_deg;
+		double dipDir = (iDipDir + 0.5) * angularStep_deg;
 
-		QString familyName = GetFamilyName(dip,dipDir,angularStep_deg);
+		QString familyName = GetFamilyName(dip, dipDir, angularStep_deg);
 
 		//create family group
-		ccHObject* familyGroup = new ccHObject(QString("F%1_").arg(familyIndex,2,10,QChar('0')) + familyName);
+		ccHObject* familyGroup = new ccHObject(QString("F%1_").arg(familyIndex, 2, 10, QChar('0')) + familyName);
 		if (parent)
 			parent->addChild(familyGroup);
 
 		//tag all facets consequently
 		for (FacetSet::iterator it=family.begin(); it!=family.end(); ++it)
 		{
-			(*it)->setMetaData(s_OriFamilyKey,QVariant(static_cast<uint>(familyIndex)));
-			(*it)->setMetaData(s_OriFamilyNameKey,QVariant(familyName));
+			(*it)->setMetaData(s_OriFamilyKey, QVariant(static_cast<uint>(familyIndex)));
+			(*it)->setMetaData(s_OriFamilyNameKey, QVariant(familyName));
 		}
 
 		//now we are going to regroup the facets in sub-families
@@ -152,18 +151,18 @@ public:
 
 			if (count == 2)
 			{
-				PointCoordinateType dist = CommputeHDistBetweenFacets(family[0],family[1]);
+				PointCoordinateType dist = CommputeHDistBetweenFacets(family[0], family[1]);
 				if (dist <= maxDist)
 				{
 					//same sub-family as #1
-					family[1]->setMetaData(s_OriSubFamilyKey,QVariant(static_cast<uint>(subFamilyIndex)));
+					family[1]->setMetaData(s_OriSubFamilyKey, QVariant(static_cast<uint>(subFamilyIndex)));
 					assert(family[1]->getParent() == 0);
 					subFamilyGroup->addChild(family[1]);
 				}
 				else
 				{
 					//new sub-family
-					family[1]->setMetaData(s_OriSubFamilyKey,QVariant(static_cast<uint>(++subFamilyIndex)));
+					family[1]->setMetaData(s_OriSubFamilyKey, QVariant(static_cast<uint>(++subFamilyIndex)));
 					ccHObject* subFamilyGroup2 = new ccHObject(GetSubFamilyName(subFamilyIndex));
 					familyGroup->addChild(subFamilyGroup2);
 					assert(family[1]->getParent() == 0);
@@ -343,7 +342,7 @@ public:
 
 		ccHObject::Container facets;
 		if (facetGroup)
-			facetGroup->filterChildren(facets,true,CC_TYPES::FACET);
+			facetGroup->filterChildren(facets, true, CC_TYPES::FACET);
 
 		size_t facetCount = facets.size();
 		if (facetCount == 0)
@@ -378,10 +377,10 @@ public:
 			//unique facet = unique family
 			FacetSet family(1,facet);
 
-			unsigned iDip=0,iDipDir=0;
-			GetFamilyIndexes(facet,dSteps,ddSteps,angularStep_deg,iDip,iDipDir);
+			unsigned iDip = 0, iDipDir = 0;
+			GetFamilyIndexes(facet, dSteps, ddSteps, angularStep_deg, iDip, iDipDir);
 
-			error = !ProcessFamiliy(facetGroup,family,1,iDip,iDipDir,angularStep_deg,maxDist);
+			error = !ProcessFamiliy(facetGroup, family, 1, iDip, iDipDir, angularStep_deg, maxDist);
 		}
 		else
 		{

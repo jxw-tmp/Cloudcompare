@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -24,8 +24,8 @@
 //qCC_db
 #include <ccHObject.h>
 
-//system
-#include <set>
+//Qt
+#include <QSet>
 
 //GUI
 #include <ui_graphicalSegmentationDlg.h>
@@ -60,7 +60,9 @@ public:
 	ccPolyline *getPolyLine() {return m_segmentationPoly;}
 
 	//! Returns the active 'to be segmented' set
-	const std::set<ccHObject*>& entities() const { return m_toSegment; }
+	QSet<ccHObject*>& entities() { return m_toSegment; }
+	//! Returns the active 'to be segmented' set (const version)
+	const QSet<ccHObject*>& entities() const { return m_toSegment; }
 
 	//inherited from ccOverlayDialog
 	virtual bool linkWith(ccGLWindow* win);
@@ -71,6 +73,9 @@ public:
 	bool deleteHiddenParts() const { return m_deleteHiddenParts; }
 
 	//! Remove entities from the 'to be segmented' pool
+	/** \warning 'unallocateVisibilityArray' will be called on all point clouds
+		prior to be removed from the pool.
+	**/
 	void removeAllEntities(bool unallocateVisibilityArrays);
 
 protected slots:
@@ -100,8 +105,8 @@ protected:
 	//! Whether to allow or not to exort the current segmentation polyline
 	void allowPolylineExport(bool state);
 
-	//! To be segmented entities
-	std::set<ccHObject*> m_toSegment;
+	//! Set of entities to be segmented
+	QSet<ccHObject*> m_toSegment;
 
 	//! Whether something has changed or not (for proper 'cancel')
 	bool m_somethingHasChanged;

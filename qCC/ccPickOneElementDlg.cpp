@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -17,33 +17,45 @@
 
 #include "ccPickOneElementDlg.h"
 
+//UI file
+#include <ui_pickOneElementDlg.h>
+
 ccPickOneElementDlg::ccPickOneElementDlg(	QString label,
 											QString windowTitle/*=QString()*/,
 											QWidget* parent/*=0*/)
-	: QDialog(parent)
-	, Ui::PickOneElementDialog()
+	: QDialog(parent, Qt::Tool)
+	, m_ui(new Ui_PickOneElementDialog)
 {
-	setupUi(this);
-
-	setWindowFlags(Qt::Tool/*Qt::Dialog | Qt::WindowStaysOnTopHint*/);
+	m_ui->setupUi(this);
 
 	if (!windowTitle.isNull())
+	{
 		setWindowTitle(windowTitle);
+	}
 
-	comboLabel->setText(label);
+	m_ui->comboLabel->setText(label);
+}
+
+ccPickOneElementDlg::~ccPickOneElementDlg()
+{
+	if (m_ui)
+	{
+		delete m_ui;
+		m_ui = 0;
+	}
 }
 
 void ccPickOneElementDlg::addElement(QString elementName)
 {
-	comboBox->addItem(elementName);
+	m_ui->comboBox->addItem(elementName);
 }
 
 void ccPickOneElementDlg::setDefaultIndex(int index)
 {
-	comboBox->setCurrentIndex(index);
+	m_ui->comboBox->setCurrentIndex(index);
 }
 
 int ccPickOneElementDlg::getSelectedIndex()
 {
-	return comboBox->currentIndex();
+	return m_ui->comboBox->currentIndex();
 }

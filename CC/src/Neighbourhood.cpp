@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -26,6 +27,7 @@
 #include "DistanceComputationTools.h"
 #include "ChunkedPointCloud.h"
 #include "SimpleMesh.h"
+#include "Jacobi.h"
 
 //system
 #include <string.h>
@@ -74,7 +76,7 @@ void Neighbourhood::setLSPlane(	const PointCoordinateType eq[4],
 								const CCVector3& Y,
 								const CCVector3& N)
 {
-	memcpy(m_lsPlaneEquation,eq,sizeof(PointCoordinateType)*4);
+	memcpy(m_lsPlaneEquation, eq, sizeof(PointCoordinateType)*4);
 	m_lsPlaneVectors[0] = X;
 	m_lsPlaneVectors[1] = Y;
 	m_lsPlaneVectors[2] = N;
@@ -235,24 +237,28 @@ bool Neighbourhood::computeLeastSquareBestFittingPlane()
 	if (pointCount > 3)
 	{
 		//we determine plane normal by computing the smallest eigen value of M = 1/n * S[(p-µ)*(p-µ)']
-		CCLib::SquareMatrixd eig = computeCovarianceMatrix().computeJacobianEigenValuesAndVectors();
-
-		//invalid matrix?
-		if (!eig.isValid())
+		CCLib::SquareMatrixd eigVectors;
+		std::vector<double> eigValues;
+		if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues))
+		{
+			//failed to compute the eigen values!
 			return false;
+		}
 
 		//get normal
 		{
-			CCVector3d vec;
+			CCVector3d vec(0,0,1);
+			double minEigValue = 0;
 			//the smallest eigen vector corresponds to the "least square best fitting plane" normal
-			eig.getMinEigenValueAndVector(vec.u);
+			Jacobi<double>::GetMinEigenValueAndVector(eigVectors, eigValues, minEigValue, vec.u);
 			m_lsPlaneVectors[2] = CCVector3::fromArray(vec.u);
 		}
 
 		//get also X (Y will be deduced by cross product, see below
 		{
 			CCVector3d vec;
-			eig.getMaxEigenValueAndVector(vec.u);
+			double maxEigValue = 0;
+			Jacobi<double>::GetMaxEigenValueAndVector(eigVectors, eigValues, maxEigValue, vec.u);
 			m_lsPlaneVectors[0] = CCVector3::fromArray(vec.u);
 		}
 
@@ -607,13 +613,17 @@ bool Neighbourhood::compute3DQuadric(double quadricEquation[10])
 	M.clear();
 
 	//now we compute eigen values and vectors of D
-	SquareMatrixd eig = D.computeJacobianEigenValuesAndVectors();
-	//failure?
-	if (!eig.isValid())
+	CCLib::SquareMatrixd eigVectors;
+	std::vector<double> eigValues;
+	if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues))
+	{
+		//failure
 		return false;
+	}
 
 	//we get the eigen vector corresponding to the minimum eigen value
-	/*double lambdaMin = */eig.getMinEigenValueAndVector(quadricEquation);
+	double minEigValue = 0;
+	Jacobi<double>::GetMinEigenValueAndVector(eigVectors, eigValues, minEigValue, quadricEquation);
 
 	return true;
 }
@@ -827,12 +837,13 @@ ScalarType Neighbourhood::computeCurvature(unsigned neighbourIndex, CC_CURVATURE
 			case MEAN_CURV:
 				{
 					//to sign the curvature, we need a normal!
-					PointCoordinateType H = fabs( ((1+fx2)*fyy - 2*fx*fy*fxy + (1+fy2)*fxx) ) / (2*sqrt(q)*q);
-					return static_cast<ScalarType>(H);
+					PointCoordinateType H2 = fabs( ((1+fx2)*fyy - 2*fx*fy*fxy + (1+fy2)*fxx) ) / (2*sqrt(q)*q);
+					return static_cast<ScalarType>(H2);
 				}
 
 			default:
 				assert(false);
+				break;
 			}
 		}
 		break;
@@ -850,19 +861,23 @@ ScalarType Neighbourhood::computeCurvature(unsigned neighbourIndex, CC_CURVATURE
 			}
 
 			//we determine plane normal by computing the smallest eigen value of M = 1/n * S[(p-µ)*(p-µ)']
-			CCLib::SquareMatrixd eig = computeCovarianceMatrix().computeJacobianEigenValuesAndVectors();
-
-			//invalid matrix?
-			if (!eig.isValid())
+			CCLib::SquareMatrixd eigVectors;
+			std::vector<double> eigValues;
+			if (!Jacobi<double>::ComputeEigenValuesAndVectors(computeCovarianceMatrix(), eigVectors, eigValues))
+			{
+				//failure
 				return NAN_VALUE;
+			}
 
 			//compute curvature as the rate of change of the surface
-			double e0 = eig.getEigenValues()[0];
-			double e1 = eig.getEigenValues()[1];
-			double e2 = eig.getEigenValues()[2];
-			double  sum = fabs(e0+e1+e2);
+			double e0 = eigValues[0];
+			double e1 = eigValues[1];
+			double e2 = eigValues[2];
+			double sum = fabs(e0+e1+e2);
 			if (sum < ZERO_TOLERANCE)
+			{
 				return NAN_VALUE;
+			}
 
 			double eMin = std::min(std::min(e0,e1),e2);
 			return static_cast<ScalarType>(fabs(eMin) / sum);

@@ -64,6 +64,8 @@
     </widget>
     <addaction name="actionOpen"/>
     <addaction name="actionSave"/>
+    <addaction name="actionGlobalShiftSettings"/>
+    <addaction name="separator"/>
     <addaction name="actionPrimitiveFactory"/>
     <addaction name="separator"/>
     <addaction name="menu3DMouse"/>
@@ -114,11 +116,13 @@
      <addaction name="actionShowActiveSFNext"/>
     </widget>
     <addaction name="actionFullScreen"/>
+    <addaction name="actionExclusiveFullScreen"/>
     <addaction name="actionRefresh"/>
     <addaction name="actionToggleCenteredPerspective"/>
     <addaction name="actionToggleViewerBasedPerspective"/>
     <addaction name="actionLockRotationVertAxis"/>
     <addaction name="actionEnterBubbleViewMode"/>
+    <addaction name="actionEnableCameraLink"/>
     <addaction name="separator"/>
     <addaction name="actionRenderToFile"/>
     <addaction name="actionDisplayOptions"/>
@@ -142,6 +146,8 @@
     <addaction name="actionHelp"/>
     <addaction name="actionAbout"/>
     <addaction name="actionAboutPlugins"/>
+    <addaction name="separator"/>
+    <addaction name="actionEnableQtWarnings"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -182,6 +188,7 @@
      <addaction name="actionColorize"/>
      <addaction name="actionChangeColorLevels"/>
      <addaction name="actionSetColorGradient"/>
+     <addaction name="actionRGBToGreyScale"/>
      <addaction name="actionScalarFieldFromColor"/>
      <addaction name="actionInterpolateColors"/>
      <addaction name="separator"/>
@@ -241,7 +248,7 @@
      <addaction name="separator"/>
      <addaction name="actionMeasureMeshSurface"/>
      <addaction name="actionMeasureMeshVolume"/>
-     <addaction name="actionFlagMeshVetices"/>
+     <addaction name="actionFlagMeshVertices"/>
      <addaction name="separator"/>
      <addaction name="menuMeshScalarField"/>
     </widget>
@@ -277,7 +284,7 @@
       <addaction name="actionCreateCameraSensor"/>
       <addaction name="separator"/>
       <addaction name="actionProjectUncertainty"/>
-      <addaction name="actionCheckPointsInsideFrustrum"/>
+      <addaction name="actionCheckPointsInsideFrustum"/>
      </widget>
      <addaction name="actionModifySensor"/>
      <addaction name="separator"/>
@@ -300,12 +307,19 @@
      <addaction name="actionToggleMaterials"/>
      <addaction name="actionToggleShowName"/>
     </widget>
+    <widget class="QMenu" name="menuWaveform">
+     <property name="title">
+      <string>Waveform</string>
+     </property>
+     <addaction name="actionShowWaveDialog"/>
+    </widget>
     <addaction name="menuColors"/>
     <addaction name="menuNormals"/>
     <addaction name="menuOctree"/>
     <addaction name="menuMesh"/>
     <addaction name="menuSensors"/>
     <addaction name="menuScalarFields"/>
+    <addaction name="menuWaveform"/>
     <addaction name="separator"/>
     <addaction name="actionClone"/>
     <addaction name="actionMerge"/>
@@ -415,7 +429,7 @@
      <addaction name="separator"/>
      <addaction name="actionComputeBestFitBB"/>
      <addaction name="actionDistanceToBestFitQuadric3D"/>
-     <addaction name="actionDistanceMapToMesh"/>
+     <addaction name="actionDistanceMap"/>
      <addaction name="separator"/>
      <addaction name="actionAlign"/>
      <addaction name="separator"/>
@@ -428,6 +442,8 @@
      <addaction name="actionCreateCloudFromEntCenters"/>
      <addaction name="separator"/>
      <addaction name="actionComputeBestICPRmsMatrix"/>
+     <addaction name="separator"/>
+     <addaction name="actionEnableVisualDebugTraces"/>
     </widget>
     <widget class="QMenu" name="menuFit">
      <property name="title">
@@ -464,6 +480,7 @@
     <addaction name="actionLevel"/>
     <addaction name="actionPointPicking"/>
     <addaction name="actionPointListPicking"/>
+    <addaction name="actionTracePolyline"/>
     <addaction name="separator"/>
     <addaction name="menuSandBox"/>
     <addaction name="separator"/>
@@ -479,8 +496,8 @@
   <widget class="QDockWidget" name="DockableDBTree">
    <property name="minimumSize">
     <size>
-     <width>135</width>
-     <height>172</height>
+     <width>146</width>
+     <height>175</height>
     </size>
    </property>
    <property name="floating">
@@ -513,54 +530,6 @@
        </property>
       </widget>
      </item>
-     <item>
-      <widget class="QGroupBox" name="groupBox">
-       <layout class="QVBoxLayout">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>3</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>3</number>
-        </property>
-        <item>
-         <layout class="QHBoxLayout">
-          <item>
-           <spacer>
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="checkBoxCameraLink">
-            <property name="toolTip">
-             <string>Link all 3D views cameras</string>
-            </property>
-            <property name="text">
-             <string>Camera Link</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
-     </item>
     </layout>
    </widget>
   </widget>
@@ -571,8 +540,7 @@
    </property>
    <property name="windowIcon">
     <iconset>
-     <normaloff/>
-    </iconset>
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="toolTip">
     <string>Viewing tools</string>
@@ -681,6 +649,7 @@
    <addaction name="separator"/>
    <addaction name="actionPointPicking"/>
    <addaction name="actionPointListPicking"/>
+   <addaction name="actionTracePolyline"/>
    <addaction name="actionClone"/>
    <addaction name="actionMerge"/>
    <addaction name="actionDelete"/>
@@ -881,7 +850,7 @@
     <string/>
    </property>
    <property name="shortcut">
-    <string>F11</string>
+    <string>F9</string>
    </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
@@ -1287,10 +1256,10 @@
     <string>SF arithmetic</string>
    </property>
    <property name="toolTip">
-    <string>Add, substract, multiply or divide two scalar fields</string>
+    <string>Add, subtract, multiply or divide two scalar fields</string>
    </property>
    <property name="statusTip">
-    <string>Add, substract, multiply or divide two scalar fields</string>
+    <string>Add, subtract, multiply or divide two scalar fields</string>
    </property>
   </action>
   <action name="actionColorize">
@@ -2080,6 +2049,9 @@
    <property name="toolTip">
     <string>Apply rotation and/or translation</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+T</string>
+   </property>
   </action>
   <action name="actionSmoothMeshLaplacian">
    <property name="text">
@@ -2315,7 +2287,7 @@
     <string>Set viewer-based perspective for current 3D View</string>
    </property>
    <property name="statusTip">
-    <string>Set viewer-based perspectivefor current 3D View</string>
+    <string>Set viewer-based perspective for current 3D View</string>
    </property>
   </action>
   <action name="actionSetPivotAlwaysOn">
@@ -2495,7 +2467,7 @@
     <string>Close all</string>
    </property>
    <property name="toolTip">
-    <string>Remove all entiites currently loaded in the DB tree</string>
+    <string>Remove all entities currently loaded in the DB tree</string>
    </property>
   </action>
   <action name="actionEditGlobalScale">
@@ -2527,7 +2499,7 @@
     <string>Create</string>
    </property>
   </action>
-  <action name="actionCheckPointsInsideFrustrum">
+  <action name="actionCheckPointsInsideFrustum">
    <property name="text">
     <string>Compute points visibility (with octree)</string>
    </property>
@@ -2661,12 +2633,12 @@
     <string>Measure volume</string>
    </property>
   </action>
-  <action name="actionFlagMeshVetices">
+  <action name="actionFlagMeshVertices">
    <property name="text">
     <string>Flag vertices by type</string>
    </property>
    <property name="toolTip">
-    <string>Flag vertices by type: normal (0), border (1), non manifold (2)</string>
+    <string>Flag vertices by type: normal (0), border (1), non-manifold (2)</string>
    </property>
   </action>
   <action name="actionToggleActivation">
@@ -2727,10 +2699,10 @@
      <normaloff>:/CC/images/dbPolylineSymbol.png</normaloff>:/CC/images/dbPolylineSymbol.png</iconset>
    </property>
    <property name="text">
-    <string>Extract sections</string>
+    <string>Extract sections / Unfold</string>
    </property>
    <property name="toolTip">
-    <string>Extract cloud sections along polylines</string>
+    <string>Extract cloud sections along polylines or unfold a cloud along a polyline</string>
    </property>
   </action>
   <action name="actionConvertPolylinesToMesh">
@@ -2788,9 +2760,9 @@
     <string>=</string>
    </property>
   </action>
-  <action name="actionDistanceMapToMesh">
+  <action name="actionDistanceMap">
    <property name="text">
-    <string>Distance map to mesh</string>
+    <string>Distance map</string>
    </property>
   </action>
   <action name="actionSORFilter">
@@ -2822,6 +2794,9 @@
    <property name="shortcut">
     <string>F10</string>
    </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
   </action>
   <action name="actionComputePointsVisibility">
    <property name="text">
@@ -2831,6 +2806,94 @@
   <action name="actionCompute2HalfDimVolume">
    <property name="text">
     <string>Compute 2.5D volume</string>
+   </property>
+  </action>
+  <action name="actionExclusiveFullScreen">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../icones.qrc">
+     <normaloff>:/CC/images/ccFullScreen.png</normaloff>:/CC/images/ccFullScreen.png</iconset>
+   </property>
+   <property name="text">
+    <string>Full screen (3D view)</string>
+   </property>
+   <property name="toolTip">
+    <string>Exclusive full screen (3D view)</string>
+   </property>
+   <property name="shortcut">
+    <string>F11</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
+  </action>
+  <action name="actionEnableVisualDebugTraces">
+   <property name="text">
+    <string>Enable Visual Debug Traces</string>
+   </property>
+   <property name="toolTip">
+    <string>Enables visual debug traces (active 3D view)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
+   </property>
+  </action>
+  <action name="actionRGBToGreyScale">
+   <property name="text">
+    <string>Convert to grey scale</string>
+   </property>
+   <property name="toolTip">
+    <string>Convert RGB colors to grey scale colors</string>
+   </property>
+  </action>
+  <action name="actionTracePolyline">
+   <property name="icon">
+    <iconset resource="../icones.qrc">
+     <normaloff>:/CC/images/ccTracePolyline.png</normaloff>:/CC/images/ccTracePolyline.png</iconset>
+   </property>
+   <property name="text">
+    <string>Trace Polyline</string>
+   </property>
+   <property name="toolTip">
+    <string>Trace a polyline by point picking</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+P</string>
+   </property>
+  </action>
+  <action name="actionEnableQtWarnings">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Enable Qt warnings in Console</string>
+   </property>
+  </action>
+  <action name="actionGlobalShiftSettings">
+   <property name="text">
+    <string>Global Shift settings</string>
+   </property>
+   <property name="toolTip">
+    <string>Set Global Shift &amp; Scale mechanism parameters</string>
+   </property>
+  </action>
+  <action name="actionEnableCameraLink">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Camera link</string>
+   </property>
+   <property name="toolTip">
+    <string>Link the cameras of all 3D views
+(so that they all move in the same way and at the same time)</string>
+   </property>
+  </action>
+  <action name="actionShowWaveDialog">
+   <property name="text">
+    <string>2D Waveform viewer</string>
    </property>
   </action>
  </widget>
@@ -2847,7 +2910,7 @@
  <connections>
   <connection>
    <sender>actionConsole</sender>
-   <signal>toggled(bool)</signal>
+   <signal>triggered(bool)</signal>
    <receiver>DockableConsole</receiver>
    <slot>setVisible(bool)</slot>
    <hints>

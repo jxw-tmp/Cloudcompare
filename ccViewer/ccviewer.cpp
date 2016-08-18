@@ -6,11 +6,11 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#      +++ COPYRIGHT: EDF R&D + TELECOM ParisTech (ENST-TSI) +++         #
@@ -22,6 +22,7 @@
 //Qt
 #include <QVBoxLayout>
 #include <QMessageBox>
+#include <QString>
 
 //plugins handling
 #include <QPluginLoader>
@@ -31,6 +32,7 @@
 
 //qCC_glWindow
 #include <ccGLWindow.h>
+#include <ccGLWidget.h>
 #include <ccGuiParameters.h>
 
 //qCC_io
@@ -47,6 +49,9 @@
 #include <ccPointCloud.h>
 #include <ccGenericMesh.h>
 
+//plugins
+#include <ccPluginInfo.h>
+
 //3D mouse handler
 #ifdef CC_3DXWARE_SUPPORT
 #include <devices/3dConnexion/Mouse3DInput.h>
@@ -56,8 +61,22 @@
 #include <assert.h>
 
 //! Current version
-const double CC_VIEWER_VERSION = 1.35;
-const QString CC_VIEWER_VERSION_STR = QString::number(CC_VIEWER_VERSION,'f',2);
+struct VerInfo
+{
+	VerInfo()
+		: number(1.36)
+	{
+		title = QString::number(number,'f',2) + ".beta";
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+		title += " Stereo";
+#endif
+	}
+
+	double number;
+	QString title;
+
+};
+static const VerInfo CC_VIEWER_VERSION;
 
 //Camera parameters dialog
 ccCameraParamEditDlg* s_cpeDlg = 0;
@@ -70,17 +89,29 @@ ccViewer::ccViewer(QWidget *parent, Qt::WindowFlags flags)
 {
 	ui.setupUi(this);
 
-	setWindowTitle(QString("ccViewer V%1").arg(CC_VIEWER_VERSION_STR));
+#ifdef Q_OS_LINUX
+	 //we reset the whole stylesheet but we keep the StatusBar style
+	setStyleSheet("");	
+	setStyleSheet("QStatusBar{background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,stop:0 rgb(200,200,200), stop:1 rgb(255,255,255));}");
+#endif
+	
+	setWindowTitle(QString("ccViewer V%1").arg(CC_VIEWER_VERSION.title));
 
 	//insert GL window in a vertical layout
-	QVBoxLayout* verticalLayout_2 = new QVBoxLayout(ui.GLframe);
-	verticalLayout_2->setSpacing(0);
-	const int margin = 10;
-	verticalLayout_2->setContentsMargins(margin,margin,margin,margin);
-	QGLFormat format = QGLFormat::defaultFormat();
-	format.setSwapInterval(0);
-	m_glWindow = new ccGLWindow(ui.GLframe,format);
-	verticalLayout_2->addWidget(m_glWindow);
+	{
+		QVBoxLayout* verticalLayout = new QVBoxLayout(ui.GLframe);
+		verticalLayout->setSpacing(0);
+		const int margin = 10;
+		verticalLayout->setContentsMargins(margin, margin, margin, margin);
+
+		bool stereoMode = QSurfaceFormat::defaultFormat().stereo();
+
+		QWidget* glWidget = 0;
+		CreateGLWindow(m_glWindow, glWidget, stereoMode);
+		assert(m_glWindow && glWidget);
+
+		verticalLayout->addWidget(glWidget);
+	}
 
 	updateGLFrameGradient();
 
@@ -101,8 +132,9 @@ ccViewer::ccViewer(QWidget *parent, Qt::WindowFlags flags)
 
 	//Signals & slots connection
 	connect(m_glWindow,								SIGNAL(filesDropped(QStringList)),			this,		SLOT(addToDB(QStringList)));
-	connect(m_glWindow,								SIGNAL(entitySelectionChanged(int)),		this,		SLOT(selectEntity(int)));
-	//connect(m_glWindow,							SIGNAL(entitiesSelectionChanged(std::set<int>)),	this,		SLOT(selectEntities(std::set<int>))); //not supported!
+	connect(m_glWindow,								SIGNAL(entitySelectionChanged(ccHObject*)),	this,		SLOT(selectEntity(ccHObject*)));
+	connect(m_glWindow,								SIGNAL(exclusiveFullScreenToggled(bool)),	this,		SLOT(onExclusiveFullScreenToggled(bool)));
+	//connect(m_glWindow,							SIGNAL(entitiesSelectionChanged(std::unordered_set<int>)),	this,		SLOT(selectEntities(std::unordered_set<int>))); //not supported!
 	//connect(m_glWindow,							SIGNAL(newLabel(ccHObject*),						this,		SLOT(handleNewEntity(ccHObject*))); //nothing to do in ccViewer!
 
 	//"Options" menu
@@ -164,7 +196,7 @@ ccViewer::~ccViewer()
 	if (s_cpeDlg)
 	{
 		delete s_cpeDlg;
-		s_cpeDlg=0;
+		s_cpeDlg = 0;
 	}
 
 	ccHObject* currentRoot = m_glWindow->getSceneDB();
@@ -174,112 +206,98 @@ ccViewer::~ccViewer()
 		//m_glWindow->redraw();
 		delete currentRoot;
 	}
+#ifdef CC_GL_WINDOW_USE_QWINDOW
+	m_glWindow->setParent(0);
+#endif
 }
 
 void ccViewer::loadPlugins()
 {
 	ui.menuPlugins->setEnabled(false);
 
-	//"static" plugins
-	foreach (QObject *plugin, QPluginLoader::staticInstances())
-		loadPlugin(plugin);
-
-	ccLog::Print(QString("Application path: ")+QCoreApplication::applicationDirPath());
-
+	QString	appPath = QCoreApplication::applicationDirPath();
+	QStringList	filters;
+	
 #if defined(Q_OS_MAC)
-	// plugins are in the bundle
-	QString  path = QCoreApplication::applicationDirPath();
-	path.remove( "MacOS" );
-	QString pluginsPath = path + "Plugins/ccViewerPlugins";
-#else
-	//plugins are in bin/plugins
-	QString pluginsPath = QCoreApplication::applicationDirPath()+QString("/plugins");
-#endif
 
-	ccLog::Print(QString("Plugins lookup dir.: %1").arg(pluginsPath));
-
-	QStringList filters;
-#if defined(Q_OS_WIN)
-	filters << "*.dll";
-#elif defined(Q_OS_LINUX)
-	filters << "*.so";
-#elif defined(Q_OS_MAC)
 	filters << "*.dylib";
-#endif
-	QDir pluginsDir(pluginsPath);
-	pluginsDir.setNameFilters(filters);
-	foreach (QString filename, pluginsDir.entryList(filters))
+
+	// plugins are in the bundle
+	appPath.remove( "MacOS" );
+	
+	appPath += "Plugins/ccViewerPlugins";
+
+#elif defined(Q_OS_WIN)
+
+	filters << "*.dll";
+
+	//plugins are in bin/plugins
+	appPath += "/plugins";
+
+#elif defined(Q_OS_LINUX)	
+
+	filters << "*.so";
+
+	// Plugins are relative to the bin directory where the executable is found
+	QDir  binDir( appPath );
+	
+	if ( binDir.dirName() == "bin" )
 	{
-		QPluginLoader loader(pluginsDir.absoluteFilePath(filename));
-		QObject* plugin = loader.instance();
-		if (plugin)
+		binDir.cdUp();
+		
+		appPath = (binDir.absolutePath() + "/lib/cloudcompare/plugins");
+	}
+	else
+	{
+		// Choose a reasonable default to look in
+		appPath = "/usr/lib/cloudcompare/plugins";
+	}
+	
+#else
+#warning Need to specify the plugin path for this OS.
+#endif
+
+	tPluginInfoList	plugins;
+	ccPlugins::LoadPlugins(plugins, QStringList(appPath), filters);
+
+	for ( const tPluginInfo &plugin : plugins )
+	{
+		if (!plugin.object)
 		{
-			ccLog::Print(QString("Found new plugin! ('%1')").arg(filename));
-			if (!loadPlugin(plugin))
+			assert(false);
+			continue;
+		}
+		
+		assert(plugin.qObject);
+		plugin.qObject->setParent(this);
+
+		//is this a GL plugin?
+		if (plugin.object->getType() == CC_GL_FILTER_PLUGIN)
+		{
+			QString pluginName = plugin.object->getName();
+			if (pluginName.isEmpty())
 			{
-				ccLog::Warning("Unsupported or invalid plugin type");
+				ccLog::Warning("Plugin has an invalid (empty) name!");
+				continue;
 			}
+			ccLog::Print(QString("Plugin name: [%1] (GL filter)").arg(pluginName));
+
+			//(auto)create action
+			QAction* action = new QAction(pluginName, plugin.qObject);
+			action->setToolTip(plugin.object->getDescription());
+			action->setIcon(plugin.object->getIcon());
+			//connect default signal
+			connect(action, SIGNAL(triggered()), this, SLOT(doEnableGLFilter()));
+
+			ui.menuPlugins->addAction(action);
+			ui.menuPlugins->setEnabled(true);
+			ui.menuPlugins->setVisible(true);
 		}
 		else
 		{
-			ccLog::Warning(QString("[Plugin] %1")/*.arg(pluginsDir.absoluteFilePath(filename))*/.arg(loader.errorString()));
+			//ignored
 		}
 	}
-}
-
-bool ccViewer::loadPlugin(QObject *plugin)
-{
-	//is this a GL plugin?
-	ccGLFilterPluginInterface* glPlugin = qobject_cast<ccGLFilterPluginInterface*>(plugin);
-	if (glPlugin)
-	{
-		plugin->setParent(this);
-
-		QString pluginName = glPlugin->getName();
-		if (pluginName.isEmpty())
-		{
-			ccLog::Warning("Plugin has an invalid (empty) name!");
-			return false;
-		}
-		ccLog::Print("Plugin name: [%s] (GL filter)",qPrintable(pluginName));
-
-		//(auto)create action
-		QAction* action = new QAction(pluginName,plugin);
-		action->setToolTip(glPlugin->getDescription());
-		action->setIcon(glPlugin->getIcon());
-		//connect default signal
-		connect(action, SIGNAL(triggered()), this, SLOT(doEnableGLFilter()));
-
-		ui.menuPlugins->addAction(action);
-		ui.menuPlugins->setEnabled(true);
-		ui.menuPlugins->setVisible(true);
-		return true;
-	}
-
-	//is this an IO plugin?
-	ccIOFilterPluginInterface* ioPlugin = qobject_cast<ccIOFilterPluginInterface*>(plugin);
-	if (ioPlugin)
-	{
-		plugin->setParent(this);
-
-		QString pluginName = ioPlugin->getName();
-		if (pluginName.isEmpty())
-		{
-			ccLog::Warning("Plugin has an invalid (empty) name!");
-			return false;
-		}
-		ccLog::Print("Plugin name: [%s] (I/O filter)",qPrintable(pluginName));
-
-		FileIOFilter::Shared filter = ioPlugin->getFilter(0);
-		if (filter)
-		{
-			FileIOFilter::Register(filter);
-			ccLog::Print(QString("\tfile extension: %1").arg(filter->getDefaultExtension().toUpper()));
-		}
-	}
-
-	ccLog::Warning("Only 'GL filter' and 'I/O' plugins are supported for now!");
-	return false;
 }
 
 void ccViewer::doDisableGLFilter()
@@ -361,7 +379,7 @@ void ccViewer::doActionDeleteSelectedEntity()
 	m_glWindow->redraw();
 }
 
-void ccViewer::selectEntity(int uniqueID)
+void ccViewer::selectEntity(ccHObject* toSelect)
 {
 	ccHObject* currentRoot = m_glWindow->getSceneDB();
 	if (!currentRoot)
@@ -371,7 +389,6 @@ void ccViewer::selectEntity(int uniqueID)
 	ui.menuSelectSF->clear();
 	ui.menuSelected->setEnabled(false);
 
-	ccHObject* toSelect = currentRoot->find(uniqueID);
 	if (toSelect)
 	{
 		toSelect->setSelected(true);
@@ -470,11 +487,18 @@ void ccViewer::updateGLFrameGradient()
 	//display parameters
 	static const ccColor::Rgbub s_black(0,0,0);
 	static const ccColor::Rgbub s_white(255,255,255);
-	const ccColor::Rgbub& bkgCol = m_glWindow->isStereoModeEnabled() ? s_black : m_glWindow->getDisplayParameters().backgroundCol;
-	const ccColor::Rgbub& forCol = m_glWindow->isStereoModeEnabled() ? s_white : m_glWindow->getDisplayParameters().pointsDefaultCol;
+	bool stereoModeEnabled = m_glWindow->stereoModeIsEnabled();
+	const ccColor::Rgbub& bkgCol = stereoModeEnabled ? s_black : m_glWindow->getDisplayParameters().backgroundCol;
+	const ccColor::Rgbub& forCol = stereoModeEnabled ? s_white : m_glWindow->getDisplayParameters().pointsDefaultCol;
 
-	glColor3ubv(bkgCol.rgb);
-	glColor3ub(255-forCol.r,255-forCol.g,255-forCol.b);
+	//QOpenGLFunctions_2_1* glFunc = m_glWindow->context()->versionFunctions<QOpenGLFunctions_2_1>();
+	//if (!glFunc)
+	//{
+	//	return;
+	//}
+
+	//glFunc->glColor3ubv(bkgCol.rgb);
+	//glFunc->glColor3ub(255-forCol.r,255-forCol.g,255-forCol.b);
 
 	QString styleSheet = QString("QFrame{border: 2px solid white; border-radius: 10px; background: qlineargradient(x1:0, y1:0, x2:0, y2:1,stop:0 rgb(%1,%2,%3), stop:1 rgb(%4,%5,%6));}")
 								.arg(bkgCol.r)
@@ -483,6 +507,7 @@ void ccViewer::updateGLFrameGradient()
 								.arg(255-forCol.r)
 								.arg(255-forCol.g)
 								.arg(255-forCol.b);
+	
 	ui.GLframe->setStyleSheet(styleSheet);
 }
 
@@ -503,10 +528,12 @@ void ccViewer::addToDB(QStringList filenames)
 	FileIOFilter::LoadParameters parameters;
 	parameters.alwaysDisplayLoadDialog = false;
 	parameters.shiftHandlingMode = ccGlobalShiftManager::NO_DIALOG_AUTO_SHIFT;
+	parameters.parentWidget = this;
 
 	for (int i=0; i<filenames.size(); ++i)
 	{
-		ccHObject* newEntities = FileIOFilter::LoadFromFile(filenames[i],parameters);
+		CC_FILE_ERROR result = CC_FERR_NO_ERROR;
+		ccHObject* newEntities = FileIOFilter::LoadFromFile(filenames[i], parameters, result);
 
 		if (newEntities)
 		{
@@ -540,6 +567,12 @@ void ccViewer::addToDB(QStringList filenames)
 					}
 				}
 			}
+		}
+		
+		if (result == CC_FERR_CANCELED_BY_USER)
+		{
+			//stop importing the file if the user has cancelled the current process!
+			break;
 		}
 	}
 
@@ -610,7 +643,9 @@ void ccViewer::reflectPerspectiveState()
 
 bool ccViewer::checkStereoMode()
 {
-	if (m_glWindow && m_glWindow->getViewportParameters().perspectiveView && m_glWindow->isStereoModeEnabled())
+	if (	m_glWindow
+		&&	m_glWindow->getViewportParameters().perspectiveView
+		&&	m_glWindow->stereoModeIsEnabled())
 	{
 		if (QMessageBox::question(this,"Stereo mode", "Stereo-mode only works in perspective mode. Do you want to disable it?", QMessageBox::Yes, QMessageBox::No) == QMessageBox::No)
 		{
@@ -728,14 +763,21 @@ void ccViewer::toggleStereoMode(bool state)
 	if (!m_glWindow)
 		return;
 
-	bool isActive = m_glWindow->isStereoModeEnabled();
+	bool isActive = m_glWindow->stereoModeIsEnabled();
 	if (isActive == state)
+	{
+		//nothing to do
 		return;
+	}
 
 	if (isActive)
 	{
-		m_glWindow->enableStereoMode(false);
-		ui.menuPlugins->setEnabled(true);
+		m_glWindow->disableStereoMode();
+		if (m_glWindow->getStereoParams().glassType == ccGLWindow::StereoParams::NVIDIA_VISION)
+		{
+			//disable full screen
+			ui.actionFullScreen->setChecked(false);
+		}
 	}
 	else
 	{
@@ -751,21 +793,39 @@ void ccViewer::toggleStereoMode(bool state)
 			return;
 		}
 
+		ccGLWindow::StereoParams params = smDlg.getParameters();
+#ifndef CC_GL_WINDOW_USE_QWINDOW
+		if (!params.isAnaglyph())
+		{
+			ccLog::Error("This version doesn't handle stereo glasses and headsets.\nUse the 'Stereo' version instead.");
+			//activation of the stereo mode failed: cancel selection
+			ui.actionEnableStereo->blockSignals(true);
+			ui.actionEnableStereo->setChecked(false);
+			ui.actionEnableStereo->blockSignals(false);
+			return;
+		}
+#endif
+
 		//force perspective state!
 		if (!m_glWindow->getViewportParameters().perspectiveView)
 		{
-			m_glWindow->setPerspectiveState(true,true);
+			m_glWindow->setPerspectiveState(true, true);
 			reflectPerspectiveState();
 		}
-		//and disable GL filters :(
+
+		if (params.glassType == ccGLWindow::StereoParams::NVIDIA_VISION)
 		{
-			//FIXME
-			m_glWindow->setGlFilter(0);
-			ui.menuPlugins->setEnabled(false);
+			//force full screen
+			ui.actionFullScreen->setChecked(true);
 		}
 
-		m_glWindow->setStereoParams(smDlg.getParameters());
-		m_glWindow->enableStereoMode(true);
+		if (!m_glWindow->enableStereoMode(params))
+		{
+			//activation of the stereo mode failed: cancel selection
+			ui.actionEnableStereo->blockSignals(true);
+			ui.actionEnableStereo->setChecked(false);
+			ui.actionEnableStereo->blockSignals(false);
+		}
 	}
 
 	updateDisplay();
@@ -773,13 +833,29 @@ void ccViewer::toggleStereoMode(bool state)
 
 void ccViewer::toggleFullScreen(bool state)
 {
-	if (state)
-		showFullScreen();
-	else
-		showNormal();
-
 	if (m_glWindow)
-		m_glWindow->redraw();
+	{
+		if (m_glWindow->stereoModeIsEnabled() && m_glWindow->getStereoParams().glassType == ccGLWindow::StereoParams::NVIDIA_VISION)
+		{
+			//auto disable stereo mode as NVidia Vision only works in full screen mode!
+			ui.actionEnableStereo->setChecked(false);
+		}
+
+		m_glWindow->toggleExclusiveFullScreen(state);
+	}
+}
+
+void ccViewer::onExclusiveFullScreenToggled(bool state)
+{
+	ui.actionFullScreen->blockSignals(true);
+	ui.actionFullScreen->setChecked(m_glWindow ? m_glWindow->exclusiveFullScreen() : false);
+	ui.actionFullScreen->blockSignals(false);
+
+	if (!state && m_glWindow && m_glWindow->stereoModeIsEnabled() && m_glWindow->getStereoParams().glassType == ccGLWindow::StereoParams::NVIDIA_VISION)
+	{
+		//auto disable stereo mode as NVidia Vision only works in full screen mode!
+		ui.actionEnableStereo->setChecked(false);
+	}
 }
 
 void ccViewer::toggleRotationAboutVertAxis()
@@ -798,11 +874,11 @@ void ccViewer::toggleRotationAboutVertAxis()
 
 	if (isLocked)
 	{
-		m_glWindow->displayNewMessage(QString("[ROTATION LOCKED]"),ccGLWindow::UPPER_CENTER_MESSAGE,false,24*3600,ccGLWindow::ROTAION_LOCK_MESSAGE);
+		m_glWindow->displayNewMessage(QString("[ROTATION LOCKED]"), ccGLWindow::UPPER_CENTER_MESSAGE, false, 24 * 3600, ccGLWindow::ROTAION_LOCK_MESSAGE);
 	}
 	else
 	{
-		m_glWindow->displayNewMessage(QString(),ccGLWindow::UPPER_CENTER_MESSAGE,false,0,ccGLWindow::ROTAION_LOCK_MESSAGE);
+		m_glWindow->displayNewMessage(QString(), ccGLWindow::UPPER_CENTER_MESSAGE, false, 0, ccGLWindow::ROTAION_LOCK_MESSAGE);
 	}
 	m_glWindow->redraw();
 }
@@ -817,17 +893,27 @@ void ccViewer::doActionDisplayShortcuts()
 	text += "F4 : Set viewer-based perspective\n";
 	text += "F6 : Toggle sun light\n";
 	text += "F7 : Toggle custom light\n";
-	text += "F11: Toggle full screen\n";
-	text += "Z: Zoom on selected entity\n";
+	text += "F8 : Toggle Console display\n";
+	text += "F9 : Toggle full screen\n";
+	text += "F11: Toggle exclusive full screen\n";
+	text += "Z  : Zoom on selected entity\n";
+	text += "L  : Lock rotation around Z\n";
+	text += "B  : Enter/leave bubble view mode\n";
 	text += "DEL: Delete selected entity\n";
+	text += "+  : Zoom in\n";
+	text += "-  : Zoom out\n";
 	text += "\n";
-	text += "Ctrl+D: Display parameters\n";
-	text += "Ctrl+C: Camera parameters\n";
+	text += "Shift + C: Toggle color ramp visibility\n";
+	text += "Shift + up arrow: activate previous SF\n";
+	text += "Shift + down arrow: activate next SF\n";
+	text += "\n";
+	text += "Ctrl + D: Display parameters\n";
+	text += "Ctrl + C: Camera parameters\n";
 	text += "\n";
 	text += "Left click: Select entity\n";
 	//text += "Ctrl + left click: Select multiple entities (toggle)\n";
 	//text += "Alt + left button hold: Select multiple entities (rectangular area)\n";
-	text += "Shift + left click (on a point): create and display label\n";
+	text += "Shift + left click (on a point/triangle): spawn a label\n";
 	text += "Right click (on a label): expand/collapse\n";
 	msgBox.setText(text);
 	msgBox.exec();
@@ -918,7 +1004,7 @@ void ccViewer::toggleColorbarShown(bool state)
 	if (!cloud)
 		return;
 	cloud->showSFColorsScale(state);
-	m_glWindow->redraw(true);
+	m_glWindow->redraw(true, false);
 }
 
 void ccViewer::changeCurrentScalarField(bool state)
@@ -980,7 +1066,7 @@ void ccViewer::doActionAbout()
 
 	Ui::AboutDialog ui;
 	ui.setupUi(&aboutDialog);
-	ui.textEdit->setHtml(ui.textEdit->toHtml().arg(CC_VIEWER_VERSION_STR));
+	ui.textEdit->setHtml(ui.textEdit->toHtml().arg(CC_VIEWER_VERSION.title));
 
 	aboutDialog.exec();
 }

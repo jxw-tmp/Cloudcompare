@@ -100,10 +100,14 @@ void RansacShapeDetector::GenerateCandidates(
 {
 	size_t genCands = 0;
 
+#ifdef DOPARALLEL
 	#pragma omp parallel
+#endif
 	{
 	ScoreVisitorT scoreVisitorCopy(scoreVisitor);
+#ifdef DOPARALLEL
 	#pragma omp for schedule(dynamic, 10) reduction(+:genCands)
+#endif
 	for(int candIter = 0; candIter < 200; ++candIter)
 	{
 		// pick a sample level
@@ -160,7 +164,9 @@ void RansacShapeDetector::GenerateCandidates(
 				currentSize, m_options.m_bitmapEpsilon, 1);
 			if(cand.UpperBound() < m_options.m_minSupport)
 			{
+#ifdef DOPARALLEL
 				#pragma omp critical
+#endif
 				{
 				(*sampleLevelScores)[node->Level()].first += cand.ExpectedValue();
 				++(*sampleLevelScores)[node->Level()].second;
@@ -168,7 +174,9 @@ void RansacShapeDetector::GenerateCandidates(
 				continue;
 			}
 
+#ifdef DOPARALLEL
 			#pragma omp critical
+#endif
 			{
 				(*sampleLevelScores)[node->Level()].first += cand.ExpectedValue();
 				++(*sampleLevelScores)[node->Level()].second;
@@ -710,15 +718,20 @@ RansacShapeDetector::Detect(PointCloud &pc, size_t beginIdx, size_t endIdx,
 
 				// reindex global octree
 				size_t minInvalidIndex = currentSize - numInvalid + beginIdx;
+				int j = 0;
+#ifdef DOPARALLEL
 				#pragma omp parallel for schedule(static)
-				for(size_t i = 0, j = 0; i < globalOctreeIndices.size(); ++i)
+#endif
+				for(int i = 0; i < static_cast<int>(globalOctreeIndices.size()); ++i)
 					if(shapeIndex[globalOctreeIndices[i]] < minInvalidIndex)
 						globalOctreeIndices[j++] = shapeIndex[globalOctreeIndices[i]];
 				globalOctreeIndices.resize(currentSize - numInvalid);
 
 				// reindex candidates (this also recomputes the bounds)
+#ifdef DOPARALLEL
 				#pragma omp parallel for schedule(static)
-				for(size_t i = 0; i < candidates.size(); ++i)
+#endif
+				for(int i = 0; i < static_cast<int>(candidates.size()); ++i)
 					candidates[i].Reindex(shapeIndex, minInvalidIndex, mergedSubsets,
 						subsetSizes, pc, currentSize - numInvalid, m_options.m_epsilon,
 						m_options.m_normalThresh, m_options.m_bitmapEpsilon);
@@ -753,13 +766,17 @@ RansacShapeDetector::Detect(PointCloud &pc, size_t beginIdx, size_t endIdx,
 					for(size_t i = 0; i < shuffleIndices.size(); ++i)
 						reindex[shuffleIndices[i]] = i;
 					// reindex global octree
+#ifdef DOPARALLEL
 					#pragma omp parallel for schedule(static)
-					for(size_t i = 0; i < globalOctreeIndices.size(); ++i)
+#endif
+					for(int i = 0; i < static_cast<int>(globalOctreeIndices.size()); ++i)
 						if(globalOctreeIndices[i] < reindex.size())
 							globalOctreeIndices[i] = reindex[globalOctreeIndices[i]];
 					// reindex candidates
+#ifdef DOPARALLEL
 					#pragma omp parallel for schedule(static, 100)
-					for(size_t i = 0; i < candidates.size(); ++i)
+#endif
+					for(int i = 0; i < static_cast<int>(candidates.size()); ++i)
 						candidates[i].Reindex(reindex);
 					for(size_t i = 1, begin = subsetSizes[0] + beginIdx;
 						i < octrees.size(); begin += subsetSizes[i], ++i)
@@ -797,8 +814,10 @@ RansacShapeDetector::Detect(PointCloud &pc, size_t beginIdx, size_t endIdx,
 			{
 				// the bounds of the candidates have become invalid and have to be
 				// recomputed
+#ifdef DOPARALLEL
 				#pragma omp parallel for schedule(static, 100)
-				for(size_t i = 0; i < candidates.size(); ++i)
+#endif
+				for(int i = 0; i < static_cast<int>(candidates.size()); ++i)
 					candidates[i].RecomputeBounds(octrees, pc, subsetScoreVisitor,
 						currentSize - numInvalid, m_options.m_epsilon,
 						m_options.m_normalThresh, m_options.m_bitmapEpsilon);

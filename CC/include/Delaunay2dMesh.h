@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -19,10 +20,11 @@
 #define DELAUNAY2D_MESH_HEADER
 
 //Local
-#include "CCCoreLib.h"
 #include "GenericIndexedMesh.h"
-#include "Neighbourhood.h"
 #include "SimpleTriangle.h"
+
+#include <cstddef>
+#include <vector>
 
 namespace CCLib
 {
@@ -48,7 +50,7 @@ public:
 
 	//! Associate this mesh to a point cloud
 	/** This particular mesh structure deals with point indexes instead of points.
-		Therefore, it is possible to change the associated point cloud (it the
+		Therefore, it is possible to change the associated point cloud (if the
 		new cloud has the same size). For example, it can be useful to compute
 		the mesh on 2D points corresponding to 3D points that have been projected
 		on a plane and then to link this structure with the 3D original	points.
@@ -60,7 +62,6 @@ public:
 	//! Build the Delaunay mesh on top a set of 2D points
 	/** \param points2D a set of 2D points
 		\param pointCountToUse number of points to use from the input set (0 = all)
-		\param forceInputPointsAsBorder if true, the input points are considered as ordered polyon vertices and 'outside' triangles will be removed
 		\param outputErrorStr error string as output by Triangle lib. (if any) [optional]
 		\return success
 	**/

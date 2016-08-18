@@ -4,11 +4,11 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the License.  #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -16,24 +16,23 @@
 //##########################################################################
 
 #include "ccFrameBufferObject.h"
-#include "ccShader.h"
 
-#include "ccFBOUtils.h"
+//Qt
+#include <QOpenGLFunctions_2_1>
 
+//system
 #include <assert.h>
 
 ccFrameBufferObject::ccFrameBufferObject()
-	: m_width(0)
+	: m_isValid(false)
+	, m_width(0)
 	, m_height(0)
 	, m_depthTexture(0)
+	, m_ownDepthTexture(false)
+	, m_colorTexture(0)
+	, m_ownColorTexture(false)
 	, m_fboId(0)
-{
-	//color textures
-	m_colorTextures[0] = 0;
-	m_colorTextures[1] = 0;
-	m_colorTextures[2] = 0;
-	m_colorTextures[3] = 0;
-}
+{}
 
 ccFrameBufferObject::~ccFrameBufferObject()
 {
@@ -42,24 +41,17 @@ ccFrameBufferObject::~ccFrameBufferObject()
 
 void ccFrameBufferObject::reset()
 {
-	if (m_depthTexture != 0)
+	if (!m_isValid)
 	{
-		glDeleteTextures(1,&m_depthTexture);
-		m_depthTexture = 0;
+		return;
 	}
-
-	for (int i=0; i<4; ++i)
-	{
-		if (m_colorTextures[i])
-		{
-			glDeleteTextures(1,m_colorTextures+i);
-			m_colorTextures[i] = 0;
-		}
-	}
+	
+	deleteDepthTexture();
+	deleteColorTexture();
 
 	if (m_fboId != 0)
 	{
-		glDeleteFramebuffersEXT(1, &m_fboId);
+		m_glExtFunc.glDeleteFramebuffers(1, &m_fboId);
 		m_fboId = 0;
 	}
 
@@ -68,199 +60,250 @@ void ccFrameBufferObject::reset()
 
 bool ccFrameBufferObject::init(unsigned w, unsigned h)
 {
-	//we check if FBO extension is supported by video card
-	if (!ccFBOUtils::CheckExtension("GL_EXT_framebuffer_object"))
-		return false;
+	if (!m_isValid)
+	{
+		if (!m_glFunc.initializeOpenGLFunctions())
+		{
+			return false;
+		}
 
-	//to support reinit
-	reset();
+		if (!m_glExtFunc.initializeOpenGLFunctions())
+		{
+			return false;
+		}
+	}
+	else
+	{
+		//to support reinit
+		reset();
+	}
 
 	m_width = w;
 	m_height = h;
 
 	// create a framebuffer object
-	glGenFramebuffersEXT(1, &m_fboId);
+	m_glExtFunc.glGenFramebuffers(1, &m_fboId);
 
-	return true;
+	m_isValid = true;
+
+	return m_fboId != 0;
 }
 
-void ccFrameBufferObject::start()
+bool ccFrameBufferObject::start()
 {
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,m_fboId);
+	if (m_isValid && m_fboId != 0)
+	{
+		m_glExtFunc.glBindFramebuffer(GL_FRAMEBUFFER_EXT, m_fboId);
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 void ccFrameBufferObject::stop()
 {
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,0);
-}
-
-GLuint ccFrameBufferObject::getID()
-{
-	return m_fboId;
-}
-
-GLuint ccFrameBufferObject::getColorTexture(unsigned i)
-{
-	assert(i<4);
-	return m_colorTextures[i];
-}
-
-GLuint ccFrameBufferObject::getDepthTexture()
-{
-	return m_depthTexture;
-}
-
-bool ccFrameBufferObject::initTexture(	unsigned index,
-										GLint internalformat,
-										GLenum format,
-										GLenum type,
-										GLint minMagFilter /*= GL_LINEAR*/,
-										GLenum target /*= GL_TEXTURE_2D*/)
-{
-	if (index >= 4)
+	if (m_isValid && m_fboId != 0)
 	{
-		//wrong index
-		return false;
+		m_glExtFunc.glBindFramebuffer(GL_FRAMEBUFFER_EXT, 0);
 	}
-
-	if (m_fboId == 0)
-	{
-		//ccLog::Warning("[FBO::initTexture] Internal error: FBO not yet initialized!");
-		return false;
-	}
-
-	start();
-
-	if (glIsTexture(m_colorTextures[index]))
-		glDeleteTextures(1,m_colorTextures+index);
-
-	glGenTextures(1,m_colorTextures+index);
-	glBindTexture(target,m_colorTextures[index]);
-
-	/*INITIAL VERSION
-	glTexImage2D(target,0,GL_RGBA,width,height,0,GL_BGRA,GL_UNSIGNED_INT_8_8_8_8_REV,NULL);
-	glTexParameteri(target,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glBindTexture(target, 0);
-	//*/
-	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, minMagFilter );
-	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minMagFilter );
-	glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(target,0,internalformat,m_width,m_height,0,format,type,0);
-
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,GL_COLOR_ATTACHMENT0_EXT,target,m_colorTextures[index],0);
-	//glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,m_colorTextures[index],0);
-
-	glBindTexture(target, 0);
-
-	bool success = false;
-	GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
-	switch (status)
-	{
-	case GL_FRAMEBUFFER_COMPLETE_EXT:
-		success = true;
-		break;
-	default:
-		//ccLog::Warning("[FBO] Color texture %i init. error: %i",index+1,status);
-		break;
-	}
-
-	stop();
-
-	return success;
 }
 
-bool ccFrameBufferObject::initTextures(	unsigned count,
-										GLint internalformat,
-										GLenum format,
-										GLenum type,
-										GLint minMagFilter /*= GL_LINEAR*/,
-										GLenum target /*= GL_TEXTURE_2D*/)
+void ccFrameBufferObject::deleteColorTexture()
 {
-	assert(count < 5);
-
-	if (m_fboId == 0)
+	if (m_isValid && m_ownColorTexture && m_glFunc.glIsTexture(m_colorTexture))
 	{
-		//ccLog::Warning("[FBO::initTextures] Internal error: FBO not yet initialized!");
-		return false;
+		m_glFunc.glDeleteTextures(1, &m_colorTexture);
 	}
-
-	for(unsigned i=0; i<count; ++i)
-		initTexture(i,internalformat,format,type,minMagFilter,target);
-
-	return true;
+	m_colorTexture = 0;
+	m_ownColorTexture = false;
 }
 
-bool ccFrameBufferObject::initDepth(GLint wrapParam /*=GL_CLAMP_TO_BORDER*/,
-									GLenum internalFormat /*=GL_DEPTH_COMPONENT24*/,
-									GLint minMagFilter /*= GL_NEAREST*/,
+void ccFrameBufferObject::deleteDepthTexture()
+{
+	if (m_isValid && m_ownDepthTexture && m_glFunc.glIsTexture(m_depthTexture))
+	{
+		m_glFunc.glDeleteTextures(1, &m_depthTexture);
+	}
+	m_depthTexture = 0;
+	m_ownDepthTexture = false;
+}
+
+bool ccFrameBufferObject::initColor(GLint internalformat/*=GL_RGBA*/,
+									GLenum format/*=GL_RGBA*/,
+									GLenum type/*=GL_UNSIGNED_BYTE*/,
+									GLint minMagFilter/*=GL_NEAREST*/,
 									GLenum target/*=GL_TEXTURE_2D*/)
 {
-	if (m_fboId==0)
+	if (!m_isValid || m_fboId == 0)
 	{
-		//ccLog::Warning("[FBO::initDepth] Internal error: FBO not yet initialized!");
+		assert(false);
 		return false;
 	}
 
-	start();
+	//create the new texture
+	m_glFunc.glPushAttrib(GL_ENABLE_BIT);
+	m_glFunc.glEnable(GL_TEXTURE_2D);
 
-	if (glIsTexture(m_depthTexture))
-		glDeleteTextures(1,&m_depthTexture);
+	GLuint texID = 0;
+	m_glFunc.glGenTextures(1, &texID);
+	m_glFunc.glBindTexture(target, texID);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, minMagFilter);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minMagFilter);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	m_glFunc.glTexImage2D(target, 0, internalformat, m_width, m_height, 0, format, type, 0);
+	m_glFunc.glBindTexture(target, 0);
 
-	glGenTextures(1,&m_depthTexture);
-	glBindTexture(target,m_depthTexture);
+	m_glFunc.glPopAttrib();
 
-	/* INITIAL VERSION
-	glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,width,height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	//*/
-	float border[] = { 1.0f,1.0f,1.0f,1.0f };
-	glTexParameteri(target, GL_TEXTURE_WRAP_S, wrapParam);
-	glTexParameteri(target, GL_TEXTURE_WRAP_T, wrapParam);
-	glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, border);
-	glTexParameteri(target, GL_DEPTH_TEXTURE_MODE, GL_LUMINANCE);
-	glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minMagFilter);
-	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, minMagFilter);
-	glTexImage2D(target,0,internalFormat,m_width,m_height,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_BYTE,0);
+	if (attachColor(texID, true, target))
+	{
+		return true;
+	}
+	else
+	{
+		m_glFunc.glDeleteTextures(1, &texID);
+		return false;
+	}
+}
 
-	//glFramebufferTextureEXT(GL_FRAMEBUFFER_EXT,GL_DEPTH_ATTACHMENT_EXT,m_depthTexture,0);
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,GL_DEPTH_ATTACHMENT_EXT,target,m_depthTexture,0);
+bool ccFrameBufferObject::attachColor(	GLuint texID,
+										bool ownTexture/*=false*/,
+										GLenum target/*=GL_TEXTURE_2D*/)
+{
+	if (!m_isValid || m_fboId == 0)
+	{
+		assert(false);
+		return false;
+	}
 
-	glBindTexture(target, 0);
+	if (!m_glFunc.glIsTexture(texID))
+	{
+		//error or simple warning?
+		assert(false);
+		//return false;
+	}
 
-	bool success = false;
-	GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+	if (!start())
+	{
+		return false;
+	}
+
+	m_glExtFunc.glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, target, texID, 0);
+	GLenum status = m_glExtFunc.glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT);
+
+	stop();
+
+	bool success = true;
 	switch (status)
 	{
 	case GL_FRAMEBUFFER_COMPLETE_EXT:
-		//ccLog::Print("[FBO] Depth init. ok");
-		success = true;
+		//remove the previous texture (if any)
+		deleteColorTexture();
+		//save the new one
+		m_colorTexture = texID;
+		m_ownColorTexture = ownTexture;
 		break;
+	
 	default:
-		//ccLog::Warning("[FBO] Depth texture init. error: %i",status);
+		qDebug("[%s line %d] OpenGL Error: %d", __FILE__, __LINE__, status);
+		success = false;
 		break;
 	}
-
-	stop();
 
 	return success;
 }
 
-void ccFrameBufferObject::setDrawBuffers(GLsizei n, const GLenum* buffers)
+bool ccFrameBufferObject::initDepth(GLint wrapParam/*=GL_CLAMP_TO_BORDER*/,
+									GLenum internalFormat/*=GL_DEPTH_COMPONENT32*/,
+									GLint minMagFilter/*=GL_NEAREST*/,
+									GLenum target/*=GL_TEXTURE_2D*/)
 {
-	assert(n>0 && n<5);
-	glDrawBuffers(n,buffers);
-	glReadBuffer(GL_NONE);
+	if (!m_isValid || m_fboId == 0)
+	{
+		assert(false);
+		return false;
+	}
+
+	if (!start())
+	{
+		return false;
+	}
+
+	//create the depth texture
+	m_glFunc.glPushAttrib(GL_ENABLE_BIT);
+	m_glFunc.glEnable(GL_TEXTURE_2D);
+
+	GLuint texID = 0;
+	m_glFunc.glGenTextures(1, &texID);
+	m_glFunc.glBindTexture(target, texID);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_WRAP_S, wrapParam);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_WRAP_T, wrapParam);
+	m_glFunc.glTexParameteri(target, GL_DEPTH_TEXTURE_MODE, GL_LUMINANCE);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minMagFilter);
+	m_glFunc.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, minMagFilter);
+	m_glFunc.glTexImage2D   (target, 0, internalFormat, m_width, m_height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
+	m_glFunc.glBindTexture  (target, 0);
+
+	m_glFunc.glPopAttrib();
+
+	if (attachDepth(texID, true, target))
+	{
+		return true;
+	}
+	else
+	{
+		m_glFunc.glDeleteTextures(1, &texID);
+		return false;
+	}
 }
 
-void ccFrameBufferObject::setDrawBuffers1()
+bool ccFrameBufferObject::attachDepth(	GLuint texID,
+										bool ownTexture/*=false*/,
+										GLenum target/*=GL_TEXTURE_2D*/)
 {
-	glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
-}
+	if (!m_isValid || m_fboId == 0)
+	{
+		assert(false);
+		return false;
+	}
 
-void ccFrameBufferObject::setDrawBuffersN(GLsizei n)
-{
-	setDrawBuffers(n,FBO_COLORS);
+	if (!m_glFunc.glIsTexture(texID))
+	{
+		//error or simple warning?
+		assert(false);
+		//return false;
+	}
+
+	if (!start())
+	{
+		return false;
+	}
+
+	m_glExtFunc.glFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, target, texID, 0);
+	GLenum status = m_glExtFunc.glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT);
+
+	stop();
+
+	bool success = true;
+	switch (status)
+	{
+	case GL_FRAMEBUFFER_COMPLETE_EXT:
+		//remove the previous texture (if any)
+		deleteDepthTexture();
+		//save the new one
+		m_depthTexture = texID;
+		m_ownDepthTexture = ownTexture;
+		break;
+	
+	default:
+		qDebug("[%s line %d] OpenGL Error: %d", __FILE__, __LINE__, status);
+		success = false;
+		break;
+	}
+
+	return success;
 }

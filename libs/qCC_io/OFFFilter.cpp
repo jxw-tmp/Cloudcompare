@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -32,7 +32,6 @@
 #include <ccLog.h>
 #include <ccMesh.h>
 #include <ccPointCloud.h>
-#include <ccProgressDialog.h>
 #include <ccNormalVectors.h>
 #include <ccOctree.h>
 
@@ -160,8 +159,6 @@ CC_FILE_ERROR OFFFilter::loadFile(QString filename, ccHObject& container, LoadPa
 		//end of file already?!
 		if (currentLine.isNull())
 			return CC_FERR_MALFORMED_FILE;
-
-		while (currentLine.startsWith("#") || currentLine.isEmpty());
 
 		//read the number of vertices/faces
 		tokens = currentLine.split(QRegExp("\\s+"),QString::SkipEmptyParts);

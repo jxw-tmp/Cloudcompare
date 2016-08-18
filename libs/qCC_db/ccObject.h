@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -19,21 +19,13 @@
 #define CC_OBJECT_HEADER
 
 //Local
-#include "qCC_db.h"
 #include "ccSerializableObject.h"
 
 //Qt
 #include <qglobal.h>
-#include <QString>
 #include <QVariant>
 #include <QSharedPointer>
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
-#define CC_QT5
-#endif
 
-
-//System
-#include <stdint.h>
 
 //! Object state flag
 enum CC_OBJECT_FLAG {	//CC_UNUSED			= 1, //DGM: not used anymore (former CC_FATHER_DEPENDENT)
@@ -93,7 +85,9 @@ typedef int64_t CC_CLASS_ENUM;
 class CC_TYPES
 {
 public:
-	static const CC_CLASS_ENUM OBJECT				=	0;
+
+	//Warning: never pass a 'constant initializer' by reference
+	static const CC_CLASS_ENUM OBJECT = 0;
 	static const CC_CLASS_ENUM HIERARCHY_OBJECT		=	CC_HIERARCH_BIT;
 	static const CC_CLASS_ENUM POINT_CLOUD			=	HIERARCHY_OBJECT	| CC_CLOUD_BIT;
 	static const CC_CLASS_ENUM MESH					=	HIERARCHY_OBJECT	| CC_MESH_BIT;
@@ -113,6 +107,7 @@ public:
 	static const CC_CLASS_ENUM SPHERE				=	PRIMITIVE			| CC_SPHERE_BIT;
 	static const CC_CLASS_ENUM TORUS				=	PRIMITIVE			| CC_TORUS_BIT;
 	static const CC_CLASS_ENUM CONE					=	PRIMITIVE			| CC_CONE_BIT;
+	static const CC_CLASS_ENUM OLD_CYLINDER_ID		=	PRIMITIVE			| CC_CYLINDER_BIT;							//for backward compatibility!
 	static const CC_CLASS_ENUM CYLINDER				=	PRIMITIVE			| CC_CYLINDER_BIT			| CC_CONE_BIT;	//cylinders are cones!
 	static const CC_CLASS_ENUM BOX					=	PRIMITIVE			| CC_BOX_BIT;
 	static const CC_CLASS_ENUM DISH					=	PRIMITIVE			| CC_DISH_BIT;
@@ -310,14 +305,14 @@ protected:
 	virtual void setFlagState(CC_OBJECT_FLAG flag, bool state);
 
 	//inherited from ccSerializableObject
-	virtual bool toFile(QFile& out) const;
+	virtual bool toFile(QFile& out) const override;
 
 	//! Reimplemented from ccSerializableObject::fromFile
 	/** Be sure to call ccObject::ReadClassIDFromFile (once)
 		before calling this method, as the classID is voluntarily
 		skipped (in order to let the user instantiate the object first)
 	**/
-	virtual bool fromFile(QFile& in, short dataVersion, int flags);
+	virtual bool fromFile(QFile& in, short dataVersion, int flags) override;
 
 	//! Object name
 	QString m_name;

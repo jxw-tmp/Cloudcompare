@@ -4,14 +4,14 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#                           COPYRIGHT: BRGM                              #
+//#                      COPYRIGHT: Thomas Dewez, BRGM                     #
 //#                                                                        #
 //##########################################################################
 
@@ -19,7 +19,6 @@
 
 //Local
 #include "facetsClassifier.h"
-#include "cellsFusionDlg.h"
 #include "classificationParamsDlg.h"
 #include "facetsExportDlg.h"
 #include "stereogramDlg.h"
@@ -33,35 +32,17 @@
 #include <QElapsedTimer>
 #include <QSettings>
 #include <QFileInfo>
-#include <QFile>
 #include <QMessageBox>
-#include <QTextStream>
 
 //qCC_db
-#include <ccFacet.h>
 #include <ccHObjectCaster.h>
-#include <ccKdTree.h>
-#include <ccPointCloud.h>
 #include <ccProgressDialog.h>
-#include <ccMesh.h>
-#include <ccNormalVectors.h>
-#include <ccPolyline.h>
 #include <ccScalarField.h>
 #include <ccOctree.h> //for ComputeAverageNorm
 
 //qCC_io
 #include <ShpFilter.h>
 
-//CCLib
-#include <Neighbourhood.h>
-#include <CCMiscTools.h>
-#include <DistanceComputationTools.h>
-
-//System
-#include <string.h>
-#include <algorithm>
-#include <vector>
-#include <set>
 
 //semi-persistent dialog values
 static unsigned s_octreeLevel = 8;
@@ -334,7 +315,7 @@ void qFacets::extractFacets(CellsFusionDlg::Algorithm algo)
 			errorMeasure,
 			s_fmUseRetroProjectionError,
 			&pDlg,
-			pc->getOctree());
+			pc->getOctree().data());
 
 		success = (result >= 0);
 	}
@@ -441,8 +422,8 @@ ccHObject* qFacets::createFacets(	ccPointCloud* cloud,
 
 	//progress notification
 	ccProgressDialog pDlg(true,m_app->getMainWindow());
-	pDlg.setMethodTitle("Facets creation");
-	pDlg.setInfo(qPrintable(QString("Components: %1").arg(componentCount)));
+	pDlg.setMethodTitle(QObject::tr("Facets creation"));
+	pDlg.setInfo(QObject::tr("Components: %1").arg(componentCount));
 	pDlg.setMaximum(static_cast<int>(componentCount));
 	pDlg.show();
 	QApplication::processEvents();
@@ -542,7 +523,7 @@ ccHObject* qFacets::createFacets(	ccPointCloud* cloud,
 	return ccGroup;
 }
 
-void qFacets::getFacetsInCurrentSelection(std::set<ccFacet*>& facets) const
+void qFacets::getFacetsInCurrentSelection(FacetSet& facets) const
 {
 	facets.clear();
 
@@ -605,7 +586,7 @@ void GetFacetMetaData(ccFacet* facet, FacetMetaData& data)
 {
 	//try to get the facet index from the facet name!
 	{
-		QStringList tokens = facet->getName().split(" ",QString::SkipEmptyParts);
+		QStringList tokens = facet->getName().split(" ", QString::SkipEmptyParts);
 		if (tokens.size() > 1 && tokens[0] == QString("facet"))
 		{
 			bool ok = true;
@@ -631,7 +612,7 @@ void GetFacetMetaData(ccFacet* facet, FacetMetaData& data)
 	//compute dip direction & dip
 	{
 		PointCoordinateType dipDir = 0, dip = 0;
-		ccNormalVectors::ConvertNormalToDipAndDipDir(data.normal,dip,dipDir);
+		ccNormalVectors::ConvertNormalToDipAndDipDir(data.normal, dip, dipDir);
 		data.dipDir_deg = static_cast<int>(dipDir);
 		data.dip_deg = static_cast<int>(dip);
 	}
@@ -684,7 +665,7 @@ void qFacets::exportFacets()
 		return;
 
 	//Retrive selected facets
-	std::set<ccFacet*> facets;
+	FacetSet facets;
 	getFacetsInCurrentSelection(facets);
 
 	if (facets.empty())
@@ -778,7 +759,7 @@ void qFacets::exportFacets()
 		{
 			//we compute the mean orientation (weighted by each facet's surface)
 			CCVector3d Nsum(0,0,0);
-			for (std::set<ccFacet*>::iterator it = facets.begin(); it != facets.end(); ++it)
+			for (FacetSet::iterator it = facets.begin(); it != facets.end(); ++it)
 			{
 				double surf = (*it)->getSurface();
 				CCVector3 N = (*it)->getNormal();
@@ -807,7 +788,7 @@ void qFacets::exportFacets()
 	CCVector3 C(0,0,0);
 	{
 		double weightSum = 0;
-		for (std::set<ccFacet*>::iterator it = facets.begin(); it != facets.end(); ++it)
+		for (FacetSet::iterator it = facets.begin(); it != facets.end(); ++it)
 		{
 			double surf = (*it)->getSurface();
 			CCVector3 Ci = (*it)->getCenter();
@@ -841,7 +822,7 @@ void qFacets::exportFacets()
 	}
 
 	//for each facet
-	for (std::set<ccFacet*>::iterator it=facets.begin(); it!=facets.end(); ++it)
+	for (FacetSet::iterator it=facets.begin(); it!=facets.end(); ++it)
 	{
 		ccFacet* facet = *it;
 		ccPolyline* poly = facet->getContour();
@@ -870,7 +851,7 @@ void qFacets::exportFacets()
 			poly = newPoly;
 		}
 
-		toSave.addChild(poly,useNativeOrientation ? ccHObject::DP_NONE : ccHObject::DP_PARENT_OF_OTHER);
+		toSave.addChild(poly, useNativeOrientation ? ccHObject::DP_NONE : ccHObject::DP_PARENT_OF_OTHER);
 
 		//save associated meta-data as 'shapefile' fields
 		{
@@ -1013,15 +994,16 @@ void qFacets::classifyFacetsByAngle(	ccHObject* group,
 	{
 		if (group->getParent())
 		{
-			m_app->removeFromDB(group,false);
+			m_app->removeFromDB(group, false);
 		}
 
-		bool success = FacetsClassifier::ByOrientation(group,angleStep_deg,maxDist);
+		bool success = FacetsClassifier::ByOrientation(group, angleStep_deg, maxDist);
 		m_app->addToDB(group);
 
 		if (!success)
 		{
-			m_app->dispToConsole("An error occurred while classifying the facets! (not enough memory?)",ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+			m_app->dispToConsole(	"An error occurred while classifying the facets! (not enough memory?)",
+									ccMainAppInterface::ERR_CONSOLE_MESSAGE);
 			return;
 		}
 	}
@@ -1040,7 +1022,7 @@ void qFacets::exportFacetsInfo()
 		return;
 
 	//Retrive selected facets
-	std::set<ccFacet*> facets;
+	FacetSet facets;
 	getFacetsInCurrentSelection(facets);
 
 	if (facets.empty())
@@ -1050,13 +1032,13 @@ void qFacets::exportFacetsInfo()
 	}
 	assert(!facets.empty());
 
-	FacetsExportDlg fDlg(FacetsExportDlg::ASCII_FILE_IO,m_app->getMainWindow());
+	FacetsExportDlg fDlg(FacetsExportDlg::ASCII_FILE_IO, m_app->getMainWindow());
 	fDlg.orientationGroupBox->setEnabled(false);
 
 	//persistent settings (default export path)
 	QSettings settings;
 	settings.beginGroup("qFacets");
-	QString facetsSavePath = settings.value("exportPath",QApplication::applicationDirPath()).toString();
+	QString facetsSavePath = settings.value("exportPath", QApplication::applicationDirPath()).toString();
 	fDlg.destinationPathLineEdit->setText(facetsSavePath + QString("/facets.csv"));
 
 	if (!fDlg.exec())
@@ -1065,20 +1047,24 @@ void qFacets::exportFacetsInfo()
 	QString filename = fDlg.destinationPathLineEdit->text();
 
 	//save current export path to persistent settings
-	settings.setValue("exportPath",QFileInfo(filename).absolutePath());
+	settings.setValue("exportPath", QFileInfo(filename).absolutePath());
 
 	QFile outFile(filename);
 	if (outFile.exists())
 	{
 		//if the file already exists, ask for confirmation!
-		if (QMessageBox::warning(m_app->getMainWindow(),"File already exists!","File already exists! Are you sure you want to overwrite it?",QMessageBox::Yes,QMessageBox::No) == QMessageBox::No)
+		if (QMessageBox::warning(	m_app->getMainWindow(),
+									"Overwrite",
+									"File already exists! Are you sure you want to overwrite it?",
+									QMessageBox::Yes,
+									QMessageBox::No) == QMessageBox::No)
 			return;
 	}
 
 	//open CSV file
 	if (!outFile.open(QFile::WriteOnly | QFile::Text))
 	{
-		m_app->dispToConsole(QString("Failed to open file for writing! Check available space and access rights"),ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		m_app->dispToConsole(QString("Failed to open file for writing! Check available space and access rights"), ccMainAppInterface::ERR_CONSOLE_MESSAGE);
 		return;
 	}
 
@@ -1103,14 +1089,14 @@ void qFacets::exportFacetsInfo()
 	outStream << " \n";
 
 	//write data (one line per facet)
-	for (std::set<ccFacet*>::iterator it=facets.begin(); it!=facets.end(); ++it)
+	for (FacetSet::iterator it=facets.begin(); it!=facets.end(); ++it)
 	{
 		ccFacet* facet = *it;
 		FacetMetaData data;
 		GetFacetMetaData(facet, data);
 		//horizontal and vertical extensions
 		double horizExt = 0, vertExt = 0;
-		ComputeFacetExtensions(data.normal,facet->getContour(),horizExt,vertExt);
+		ComputeFacetExtensions(data.normal, facet->getContour(), horizExt, vertExt);
 
 		outStream << data.facetIndex << ";";
 		outStream << data.center.x << ";" << data.center.y << ";" << data.center.z << ";";
@@ -1136,7 +1122,3 @@ QIcon qFacets::getIcon() const
 {
 	return QIcon(QString::fromUtf8(":/CC/plugin/qFacets/qFacets.png"));
 }
-
-#ifndef CC_QT5
-Q_EXPORT_PLUGIN2(qFacets,qFacets);
-#endif

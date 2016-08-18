@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -26,16 +26,10 @@
 #include <CCGeom.h>
 
 //Qt
-#include <QString>
 #include <QStringList>
 #include <QRegExp>
-#include <QFile>
 #include <QTextStream>
 
-//System
-#include <math.h>
-#include <string.h>
-#include <assert.h>
 
 //! Model view matrix size (OpenGL)
 static const unsigned OPENGL_MATRIX_SIZE = 16;
@@ -131,7 +125,7 @@ public:
 
 	//! Creates a transformation matrix that rotates a vector to another
 	/** Adapted from  "Efficiently Building a Matrix to Rotate One Vector to Another"
-		By Tomas Möller, John Hughes, Journal of Graphics Tools, 4(4):1-4, 1999
+		By Tomas MÃ¶ller, John Hughes, Journal of Graphics Tools, 4(4):1-4, 1999
 		\param from normalized non-zero source vector
 		\param to normalized non-zero destination vector
 	**/
@@ -145,16 +139,16 @@ public:
 		{
 			// "to" vector most nearly orthogonal to "from"
 			Vector3Tpl<T> x(0,0,0);
-			if (x.x < x.y)
+			if (fabs(from.x) < fabs(from.y))
 			{
-				if (x.x < x.z)
+				if (fabs(from.x) < fabs(from.z))
 					x.x = static_cast<T>(1);
 				else
 					x.z = static_cast<T>(1);
 			}
 			else
 			{
-				if (x.y < x.z)
+				if (fabs(from.y) < fabs(from.z))
 					x.y = static_cast<T>(1);
 				else
 					x.z = static_cast<T>(1);
@@ -172,9 +166,9 @@ public:
 			{
 				for (unsigned j=0; j<3; j++)
 				{
-					mat[i*4+j] =	  c3 * v.u[i] * u.u[j]
-									- c2 * v.u[i] * v.u[j]
-									- c1 * u.u[i] * u.u[j];
+					mat[i*4+j] =  c3 * v.u[i] * u.u[j]
+								- c2 * v.u[i] * v.u[j]
+								- c1 * u.u[i] * u.u[j];
 				}
 				mat[i*4+i] += static_cast<T>(1);
 			}
@@ -616,15 +610,14 @@ public:
 		{
 			theta_rad = -asin(CC_MAT_R31);
 			T cos_theta = cos(theta_rad);
-			psi_rad = atan2(CC_MAT_R32/cos_theta, CC_MAT_R33/cos_theta);
-			phi_rad = atan2(CC_MAT_R21/cos_theta, CC_MAT_R11/cos_theta);
+			psi_rad = atan2(CC_MAT_R32 / cos_theta, CC_MAT_R33 / cos_theta);
+			phi_rad = atan2(CC_MAT_R21 / cos_theta, CC_MAT_R11 / cos_theta);
 
 			//Other solution
-			/*theta = M_PI+asin(CC_MAT_R31);
-			T cos_theta = cos(theta);
-			psi = atan2(CC_MAT_R32/cos_theta,CC_MAT_R33/cos_theta);
-			phi = atan2(CC_MAT_R21/cos_theta,CC_MAT_R11/cos_theta);
-			//*/
+			//theta = M_PI + asin(CC_MAT_R31);
+			//T cos_theta = cos(theta);
+			//psi = atan2(CC_MAT_R32 / cos_theta, CC_MAT_R33 / cos_theta);
+			//phi = atan2(CC_MAT_R21 / cos_theta, CC_MAT_R11 / cos_theta);
 		}
 		else
 		{
@@ -633,12 +626,12 @@ public:
 			if (CC_MAT_R31 == -1)
 			{
 				theta_rad = static_cast<T>(M_PI_2);
-				psi_rad = atan2(CC_MAT_R12,CC_MAT_R13);
+				psi_rad = atan2(CC_MAT_R12, CC_MAT_R13);
 			}
 			else
 			{
 				theta_rad = -static_cast<T>(M_PI_2);
-				psi_rad = -atan2(CC_MAT_R12,CC_MAT_R13);
+				psi_rad = -atan2(CC_MAT_R12, CC_MAT_R13);
 			}
 		}
 
@@ -671,18 +664,18 @@ public:
 	inline Vector3Tpl<T> getTranslationAsVec3D() const { return getColumnAsVec3D(3); }
 
 	//! Sets translation (float version)
-	/** \param T 3D vector **/
+	/** \param Tr 3D vector **/
 	inline void setTranslation(const Vector3Tpl<float>& Tr) { CC_MAT_R14 = static_cast<T>(Tr.x); CC_MAT_R24 = static_cast<T>(Tr.y); CC_MAT_R34 = static_cast<T>(Tr.z); }
 	//! Sets translation (double version)
-	/** \param T 3D vector **/
+	/** \param Tr 3D vector **/
 	inline void setTranslation(const Vector3Tpl<double>& Tr) { CC_MAT_R14 = static_cast<T>(Tr.x); CC_MAT_R24 = static_cast<T>(Tr.y); CC_MAT_R34 = static_cast<T>(Tr.z); }
 
 	//! Sets translation from a float array
-	/** \param T 3D vector as a float array
+	/** \param Tr 3D vector as a float array
 	**/
 	void setTranslation(const float Tr[3]) { CC_MAT_R14 = static_cast<T>(Tr[0]); CC_MAT_R24 = static_cast<T>(Tr[1]); CC_MAT_R34 = static_cast<T>(Tr[2]); }
 	//! Sets translation from a double array
-	/** \param T 3D vector as a double array
+	/** \param Tr 3D vector as a double array
 	**/
 	void setTranslation(const double Tr[3]) { CC_MAT_R14 = static_cast<T>(Tr[0]); CC_MAT_R24 = static_cast<T>(Tr[1]); CC_MAT_R34 = static_cast<T>(Tr[2]); }
 
@@ -705,6 +698,18 @@ public:
 	**/
 	inline Vector3Tpl<T> getColumnAsVec3D(unsigned index) const { return Vector3Tpl<T>::fromArray(getColumn(index)); }
 
+	//! Sets the content of a given column
+	/** \param index column index (between 0 and 3)
+		\param v new column values
+	**/
+	inline void setColumn(unsigned index, const Vector3Tpl<T>& v) { T* col = m_mat+(index<<2); col[0] = v.x; col[1] = v.y; col[2] = v.z; }
+
+	//! Sets the content of a given column
+	/** \param index column index (between 0 and 3)
+		\param v new column values
+	**/
+	inline void setColumn(unsigned index, const Tuple4Tpl<T>& v) { T* col = m_mat+(index<<2); col[0] = v.x; col[1] = v.y; col[2] = v.z; col[3] = v.w; }
+
 	//! Multiplication by a matrix operator
 	ccGLMatrixTpl<T> operator * (const ccGLMatrixTpl<T>& mat) const
 	{
@@ -725,6 +730,11 @@ public:
 	inline Vector3Tpl<float> operator * (const Vector3Tpl<float>& vec) const { return Vector3Tpl<float>(applyX(vec),applyY(vec),applyZ(vec)); }
 	//! Multiplication by a vector operator (double version)
 	inline Vector3Tpl<double> operator * (const Vector3Tpl<double>& vec) const { return Vector3Tpl<double>(applyX(vec),applyY(vec),applyZ(vec)); }
+
+	//! Multiplication by a 4D vector operator (float version)
+	inline Tuple4Tpl<float> operator * (const Tuple4Tpl<float>& vec) const { return Tuple4Tpl<float>(applyX(vec),applyY(vec),applyZ(vec),applyW(vec)); }
+	//! Multiplication by a 4D vector operator (double version)
+	inline Tuple4Tpl<double> operator * (const Tuple4Tpl<double>& vec) const { return Tuple4Tpl<double>(applyX(vec),applyY(vec),applyZ(vec),applyW(vec)); }
 
 	//! (in place) Addition operator
 	ccGLMatrixTpl<T>& operator += (const ccGLMatrixTpl<T>& mat)
@@ -782,6 +792,12 @@ public:
 		return (*this);
 	}
 
+	//! Returns the value at a given position
+	T operator () (unsigned row, unsigned col) const
+	{
+		return m_mat[(col << 2) + row];
+	}
+
 	//! Applies transformation to a 3D vector (in place) - float version
 	/** Input vector is directly modified after calling this method
 	**/
@@ -790,6 +806,15 @@ public:
 	/** Input vector is directly modified after calling this method
 	**/
 	inline void apply(Vector3Tpl<double>& vec) const	{ vec = (*this)*vec; }
+
+	//! Applies transformation to a 4D vector (in place) - float version
+	/** Input vector is directly modified after calling this method
+	**/
+	inline void apply(Tuple4Tpl<float>& vec) const	{ vec = (*this)*vec; }
+	//! Applies transformation to a 3D vector (in place) - double version
+	/** Input vector is directly modified after calling this method
+	**/
+	inline void apply(Tuple4Tpl<double>& vec) const	{ vec = (*this)*vec; }
 
 	//! Get the resulting transformation along X dimension (float version)
 	inline float applyX(const Vector3Tpl<float>& vec) const
@@ -842,14 +867,82 @@ public:
 				+ static_cast<double>(CC_MAT_R34);
 	}
 
+	//! Get the resulting transformation along X dimension (float version)
+	inline float applyX(const Tuple4Tpl<float>& vec) const
+	{
+		return    static_cast<float>(CC_MAT_R11) * vec.x
+				+ static_cast<float>(CC_MAT_R12) * vec.y
+				+ static_cast<float>(CC_MAT_R13) * vec.z
+				+ static_cast<float>(CC_MAT_R14) * vec.w;
+	}
+	//! Get the resulting transformation along X dimension (double version)
+	inline double applyX(const Tuple4Tpl<double>& vec) const
+	{
+		return    static_cast<double>(CC_MAT_R11) * vec.x
+				+ static_cast<double>(CC_MAT_R12) * vec.y
+				+ static_cast<double>(CC_MAT_R13) * vec.z
+				+ static_cast<double>(CC_MAT_R14) * vec.w;
+	}
+
+	//! Get the resulting transformation along Y dimension (float version)
+	inline float applyY(const Tuple4Tpl<float>& vec) const
+	{
+		return    static_cast<float>(CC_MAT_R21) * vec.x
+				+ static_cast<float>(CC_MAT_R22) * vec.y
+				+ static_cast<float>(CC_MAT_R23) * vec.z
+				+ static_cast<float>(CC_MAT_R24) * vec.w;
+	}
+	//! Get the resulting transformation along Y dimension (double version)
+	inline double applyY(const Tuple4Tpl<double>& vec) const
+	{
+		return    static_cast<double>(CC_MAT_R21) * vec.x
+				+ static_cast<double>(CC_MAT_R22) * vec.y
+				+ static_cast<double>(CC_MAT_R23) * vec.z
+				+ static_cast<double>(CC_MAT_R24) * vec.w;
+	}
+
+	//! Get the resulting transformation along Z dimension (float version)
+	inline float applyZ(const Tuple4Tpl<float>& vec) const
+	{
+		return    static_cast<float>(CC_MAT_R31) * vec.x
+				+ static_cast<float>(CC_MAT_R32) * vec.y
+				+ static_cast<float>(CC_MAT_R33) * vec.z
+				+ static_cast<float>(CC_MAT_R34) * vec.w;
+	}
+	//! Get the resulting transformation along Z dimension (double version)
+	inline double applyZ(const Tuple4Tpl<double>& vec) const
+	{
+		return    static_cast<double>(CC_MAT_R31) * vec.x
+				+ static_cast<double>(CC_MAT_R32) * vec.y
+				+ static_cast<double>(CC_MAT_R33) * vec.z
+				+ static_cast<double>(CC_MAT_R34) * vec.w;
+	}
+
+	//! Get the resulting transformation along the 4th dimension (float version)
+	inline float applyW(const Tuple4Tpl<float>& vec) const
+	{
+		return    static_cast<float>(CC_MAT_R41) * vec.x
+				+ static_cast<float>(CC_MAT_R42) * vec.y
+				+ static_cast<float>(CC_MAT_R43) * vec.z
+				+ static_cast<float>(CC_MAT_R44) * vec.w;
+	}
+	//! Get the resulting transformation along the 4th dimension (double version)
+	inline double applyW(const Tuple4Tpl<double>& vec) const
+	{
+		return    static_cast<double>(CC_MAT_R41) * vec.x
+				+ static_cast<double>(CC_MAT_R42) * vec.y
+				+ static_cast<double>(CC_MAT_R43) * vec.z
+				+ static_cast<double>(CC_MAT_R44) * vec.w;
+	}
+
 	//! Applies rotation only to a 3D vector (in place) - float version
 	/** Input vector is directly modified after calling this method
 	**/
 	inline void applyRotation(Vector3Tpl<float>& vec) const
 	{
-		register float vx = vec.x;
-		register float vy = vec.y;
-		register float vz = vec.z;
+		float vx = vec.x;
+		float vy = vec.y;
+		float vz = vec.z;
 
 		vec.x =   static_cast<float>(CC_MAT_R11) * vx
 				+ static_cast<float>(CC_MAT_R12) * vy
@@ -868,9 +961,9 @@ public:
 	**/
 	inline void applyRotation(Vector3Tpl<double>& vec) const
 	{
-		register double vx = vec.x;
-		register double vy = vec.y;
-		register double vz = vec.z;
+		double vx = vec.x;
+		double vy = vec.y;
+		double vz = vec.z;
 
 		vec.x =   static_cast<double>(CC_MAT_R11) * vx
 				+ static_cast<double>(CC_MAT_R12) * vy
@@ -890,9 +983,9 @@ public:
 	**/
 	inline void applyRotation(float vec[3]) const
 	{
-		register float vx = vec[0];
-		register float vy = vec[1];
-		register float vz = vec[2];
+		float vx = vec[0];
+		float vy = vec[1];
+		float vz = vec[2];
 
 		vec[0] =  static_cast<float>(CC_MAT_R11) * vx
 				+ static_cast<float>(CC_MAT_R12) * vy
@@ -911,9 +1004,9 @@ public:
 	**/
 	inline void applyRotation(double vec[3]) const
 	{
-		register double vx = vec[0];
-		register double vy = vec[1];
-		register double vz = vec[2];
+		double vx = vec[0];
+		double vy = vec[1];
+		double vz = vec[2];
 
 		vec[0] =  static_cast<double>(CC_MAT_R11) * vx
 				+ static_cast<double>(CC_MAT_R12) * vy

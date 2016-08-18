@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -63,8 +64,31 @@ public:
 		, m_capacity(0)
 		, m_iterator(0)
 	{
-		memset(m_minVal,0,sizeof(ElementType)*N);
-		memset(m_maxVal,0,sizeof(ElementType)*N);
+		memset(m_minVal, 0, sizeof(ElementType)*N);
+		memset(m_maxVal, 0, sizeof(ElementType)*N);
+	}
+
+	//! Copy constructor
+	/**	\warning May throw a std::bad_alloc exception
+	**/
+	GenericChunkedArray(const GenericChunkedArray& gca)
+		: CCShareable()
+		, m_count(0)
+		, m_capacity(0)
+		, m_iterator(0)
+	{
+		if (!gca.copy(*this))
+		{
+			memset(m_minVal, 0, sizeof(ElementType)*N);
+			memset(m_maxVal, 0, sizeof(ElementType)*N);
+			throw std::bad_alloc();
+		}
+		else
+		{
+			memcpy(m_minVal, gca.m_minVal, sizeof(ElementType)*N);
+			memcpy(m_maxVal, gca.m_maxVal, sizeof(ElementType)*N);
+			m_iterator = gca.m_iterator;
+		}
 	}
 
 	//! Returns the array size
@@ -551,7 +575,7 @@ public:
 	{
 		assert(index < chunksCount());
 #ifdef CC_ENV_64
-		return  (index + 1 < chunksCount() ? MAX_NUMBER_OF_ELEMENTS_PER_CHUNK : currentSize() % MAX_NUMBER_OF_ELEMENTS_PER_CHUNK);
+		return  (index + 1 < chunksCount() ? MAX_NUMBER_OF_ELEMENTS_PER_CHUNK : currentSize() - index * MAX_NUMBER_OF_ELEMENTS_PER_CHUNK);
 #else
 		return m_perChunkCount[index];
 #endif
@@ -580,18 +604,21 @@ public:
 	}
 
 	//! Copy array data to another one
-	/** \param dest destination array (will be resize if necessary)
+	/** \warning only the array content is copied!
+		\param dest destination array (will be resized if necessary)
 		\return success
 	**/
 	bool copy(GenericChunkedArray<N,ElementType>& dest) const
 	{
 		unsigned count = currentSize();
 		if (!dest.resize(count))
+		{
 			return false;
+		}
 		
 		//copy content		
 #ifdef CC_ENV_64
-		std::copy(m_data.begin(),m_data.end(),dest.m_data.begin());
+		std::copy(m_data.begin(), m_data.end(), dest.m_data.begin());
 #else
 		unsigned copyCount = 0;
 		assert(dest.m_theChunks.size() <= m_theChunks.size());
@@ -663,6 +690,29 @@ public:
 		, m_capacity(0)
 		, m_iterator(0)
 	{}
+
+	//! Copy constructor
+	/**	\warning May throw a std::bad_alloc exception
+	**/
+	GenericChunkedArray(const GenericChunkedArray& gca)
+		: CCShareable()
+		, m_minVal(gca.m_minVal)
+		, m_maxVal(gca.m_maxVal)
+		, m_count(0)
+		, m_capacity(0)
+		, m_iterator(0)
+	{
+		if (!gca.copy(*this))
+		{
+			throw std::bad_alloc();
+		}
+		else
+		{
+			m_minVal = gca.m_minVal;
+			m_maxVal = gca.m_maxVal;
+			m_iterator = gca.m_iterator;
+		}
+	}
 
 	//! Returns the array size
 	/** This corresponds to the number of inserted elements
@@ -1124,7 +1174,7 @@ public:
 	{
 		assert(index < chunksCount());
 #ifdef CC_ENV_64
-		return  (index + 1 < chunksCount() ? MAX_NUMBER_OF_ELEMENTS_PER_CHUNK : currentSize() % MAX_NUMBER_OF_ELEMENTS_PER_CHUNK);
+		return  (index + 1 < chunksCount() ? MAX_NUMBER_OF_ELEMENTS_PER_CHUNK : currentSize() - index * MAX_NUMBER_OF_ELEMENTS_PER_CHUNK);
 #else
 		return m_perChunkCount[index];
 #endif
@@ -1153,18 +1203,21 @@ public:
 	}
 
 	//! Copy array data to another one
-	/** \param dest destination array (will be resized if necessary)
+	/** \warning only the array content is copied!
+		\param dest destination array (will be resized if necessary)
 		\return success
 	**/
 	bool copy(GenericChunkedArray<1,ElementType>& dest) const
 	{
 		unsigned count = currentSize();
 		if (!dest.resize(count))
+		{
 			return false;
+		}
 		
 		//copy content		
 #ifdef CC_ENV_64
-		std::copy(m_data.begin(),m_data.end(),dest.m_data.begin());
+		std::copy(m_data.begin(), m_data.end(), dest.m_data.begin());
 #else
 		unsigned copyCount = 0;
 		assert(dest.m_theChunks.size() <= m_theChunks.size());

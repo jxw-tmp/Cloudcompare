@@ -4,11 +4,12 @@
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 of the License.  #
+//#  published by the Free Software Foundation; version 2 or later of the  #
+//#  License.                                                              #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -22,7 +23,7 @@
 #include "ScalarField.h"
 
 //STL
-#include <set>
+#include <unordered_set>
 
 //! Garbage container (automatically deletes pointers when destroyed)
 template<typename C> class Garbage
@@ -62,14 +63,14 @@ public:
 	~Garbage()
 	{
 		//dispose of left over
-		typedef typename std::set<C*>::iterator iterator;
+		typedef typename std::unordered_set<C*>::iterator iterator;
 		for (iterator it = m_items.begin(); it != m_items.end(); ++it)
 			delete *it;
 		m_items.clear();
 	}
 
 	//! Items to delete
-	std::set<C*> m_items;
+	std::unordered_set<C*> m_items;
 };
 
 //! Speciailization for ScalarFields
@@ -110,13 +111,15 @@ public:
 	~Garbage()
 	{
 		//dispose of left over
-		for (std::set<CCLib::ScalarField*>::iterator it = m_items.begin(); it != m_items.end(); ++it)
+		for (std::unordered_set<CCLib::ScalarField*>::iterator it = m_items.begin(); it != m_items.end(); ++it)
+		{
 			(*it)->release();
+		}
 		m_items.clear();
 	}
 
 	//! Items to delete
-	std::set<CCLib::ScalarField*> m_items;
+	std::unordered_set<CCLib::ScalarField*> m_items;
 };
 
 #endif //CC_GARBAGE_HEADER

@@ -27,8 +27,10 @@ function( target_link_ffmpeg ) # 1 argument: ARGV0 = project name
 		foreach( libfile ${FFMPEG_LIBRARIES_ROOT_NAME} )
 			if (WIN32)
 				LIST(APPEND FFMPEG_LIBRARIES ${FFMPEG_LIBRARY_DIR}/${libfile}.lib )
+			elseif ( APPLE )
+				LIST(APPEND FFMPEG_LIBRARIES ${FFMPEG_LIBRARY_DIR}/lib${libfile}.dylib )
 			else()
-				LIST(APPEND FFMPEG_LIBRARIES ${FFMPEG_LIBRARY_DIR}/lib${libfile}.a )
+				LIST(APPEND FFMPEG_LIBRARIES ${FFMPEG_LIBRARY_DIR}/lib${libfile}.so )
 			endif()
 		endforeach()
 
@@ -65,17 +67,9 @@ if (WIN32)
 		file (GLOB SW_DLLS ${FFMPEG_BINARY_DIR}/sw*.dll)
 		LIST( APPEND FFMEG_DLL ${SW_DLLS} )
 
-		message(${FFMEG_DLL})
+		message(STATUS "${FFMEG_DLL}")
 		
-		if( NOT CMAKE_CONFIGURATION_TYPES )
-			install( FILES ${FFMEG_DLL} DESTINATION ${ARGV0} )
-		else()
-			#release DLL
-			install( FILES ${FFMEG_DLL} CONFIGURATIONS Release DESTINATION ${ARGV0} )
-			install( FILES ${FFMEG_DLL} CONFIGURATIONS RelWithDebInfo DESTINATION ${ARGV0}_withDebInfo )
-			#debug DLL
-			install( FILES ${FFMEG_DLL} CONFIGURATIONS Debug DESTINATION ${ARGV0}_debug )
-		endif()
+		copy_files("${FFMEG_DLL}" ${ARGV0}) #mind the quotes
 	
 	else()
 

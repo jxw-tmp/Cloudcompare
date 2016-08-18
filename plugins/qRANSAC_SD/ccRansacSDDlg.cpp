@@ -1,17 +1,17 @@
 //##########################################################################
 //#                                                                        #
-//#                     CLOUDCOMPARE PLUGIN: qRANSAC_SD                    #
+//#                    CLOUDCOMPARE PLUGIN: qRANSAC_SD                     #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#               COPYRIGHT: Daniel Girardeau-Montaut                      #
+//#                  COPYRIGHT: Daniel Girardeau-Montaut                   #
 //#                                                                        #
 //##########################################################################
 
@@ -23,13 +23,13 @@ static int    s_minSupport       = 500;		// this is the minimal numer of points 
 static double s_maxNormalDev_deg = 25.0;	// maximal normal deviation from ideal shape (in degrees)
 static double s_probability      = 0.01;	// probability that no better candidate was overlooked during sampling
 
-ccRansacSDDlg::ccRansacSDDlg(QWidget* parent) : QDialog(parent), Ui::RansacSDDialog()
+ccRansacSDDlg::ccRansacSDDlg(QWidget* parent)
+	: QDialog(parent, Qt::Tool)
+	, Ui::RansacSDDialog()
 {
 	setupUi(this);
 
 	connect(buttonBox, SIGNAL(accepted()), this, SLOT(saveSettings()));
-
-	setWindowFlags(Qt::Tool/*Qt::Dialog | Qt::WindowStaysOnTopHint*/);
 
 	supportPointsSpinBox->setValue(s_minSupport);
 	maxNormDevAngleSpinBox->setValue(s_maxNormalDev_deg);

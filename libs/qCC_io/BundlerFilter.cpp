@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -30,10 +30,6 @@
 #include <ccGLMatrix.h>
 #include <ccHObjectCaster.h>
 #include <ccCameraSensor.h>
-//#define TEST_TEXTURED_BUNDLER_IMPORT
-#ifdef TEST_TEXTURED_BUNDLER_IMPORT
-#include <ccMaterialSet.h>
-#endif
 
 //Qt
 #include <QInputDialog>
@@ -91,7 +87,7 @@ bool BundlerFilter::canSave(CC_CLASS_ENUM type, bool& multiple, bool& exclusive)
 
 CC_FILE_ERROR BundlerFilter::loadFile(QString filename, ccHObject& container, LoadParameters& parameters)
 {
-	return loadFileExtended(filename,container,parameters);
+	return loadFileExtended(filename, container, parameters);
 }
 
 //ortho-rectified image related information
@@ -228,10 +224,10 @@ CC_FILE_ERROR BundlerFilter::loadFileExtended(	const QString& filename,
 	//Read Bundler '.out' file
 	{
 		//progress dialog
-		ccProgressDialog pdlg(true); //cancel available
-		CCLib::NormalizedProgress nprogress(&pdlg,camCount + (importKeypoints || orthoRectifyImages || generateColoredDTM ? ptsCount : 0));
-		pdlg.setMethodTitle("Open Bundler file");
-		pdlg.setInfo(qPrintable(QString("Cameras: %1\nPoints: %2").arg(camCount).arg(ptsCount)));
+		ccProgressDialog pdlg(true, parameters.parentWidget); //cancel available
+		CCLib::NormalizedProgress nprogress(&pdlg, camCount + (importKeypoints || orthoRectifyImages || generateColoredDTM ? ptsCount : 0));
+		pdlg.setMethodTitle(QObject::tr("Open Bundler file"));
+		pdlg.setInfo(QObject::tr("Cameras: %1\nPoints: %2").arg(camCount).arg(ptsCount));
 		pdlg.start();
 
 		//read cameras info (whatever the case!)
@@ -530,7 +526,8 @@ CC_FILE_ERROR BundlerFilter::loadFileExtended(	const QString& filename,
 	if (useAltKeypoints)
 	{
 		FileIOFilter::LoadParameters altKeypointsParams;
-		ccHObject* altKeypointsContainer = FileIOFilter::LoadFromFile(altKeypointsFilename,altKeypointsParams);
+		CC_FILE_ERROR result = CC_FERR_NO_ERROR;
+		ccHObject* altKeypointsContainer = FileIOFilter::LoadFromFile(altKeypointsFilename, altKeypointsParams, result);
 		if (	!altKeypointsContainer
 			||	altKeypointsContainer->getChildrenNumber() != 1
 			||	(!altKeypointsContainer->getChild(0)->isKindOf(CC_TYPES::POINT_CLOUD) && !altKeypointsContainer->getChild(0)->isKindOf(CC_TYPES::MESH)))
@@ -608,10 +605,10 @@ CC_FILE_ERROR BundlerFilter::loadFileExtended(	const QString& filename,
 	}
 
 	//let's try to open the image corresponding to each camera
-	ccProgressDialog ipdlg(true); //cancel available
-	CCLib::NormalizedProgress inprogress(&ipdlg,camCount);
-	ipdlg.setMethodTitle("Open & process images");
-	ipdlg.setInfo(qPrintable(QString("Images: %1").arg(camCount)));
+	ccProgressDialog ipdlg(true, parameters.parentWidget); //cancel available
+	CCLib::NormalizedProgress inprogress(&ipdlg, camCount);
+	ipdlg.setMethodTitle(QObject::tr("Open & process images"));
+	ipdlg.setInfo(QObject::tr("Images: %1").arg(camCount));
 	ipdlg.start();
 	QApplication::processEvents();
 
@@ -624,8 +621,8 @@ CC_FILE_ERROR BundlerFilter::loadFileExtended(	const QString& filename,
 	CCLib::SimpleCloud* mntSamples = 0;
 	if (generateColoredDTM)
 	{
-		ccProgressDialog toDlg(true); //cancel available
-		toDlg.setMethodTitle("Preparing colored DTM");
+		ccProgressDialog toDlg(true, parameters.parentWidget); //cancel available
+		toDlg.setMethodTitle(QObject::tr("Preparing colored DTM"));
 		toDlg.start();
 		QApplication::processEvents();
 
@@ -722,10 +719,13 @@ CC_FILE_ERROR BundlerFilter::loadFileExtended(	const QString& filename,
 			ccCameraSensor::IntrinsicParameters params;
 			params.arrayWidth = static_cast<int>(image->getW());
 			params.arrayHeight = static_cast<int>(image->getH());
-			//we use an arbitray 'pixel size'
-			params.pixelSize_mm[0] = params.pixelSize_mm[1] = 1.0f / std::max(params.arrayWidth,params.arrayHeight);
-			params.focal_pix = cam.f_pix * scaleFactor;
-			params.vFOV_rad = ccCameraSensor::ComputeFovRadFromFocalPix(cam.f_pix,params.arrayHeight);
+			//we define an arbitrary principal point
+			params.principal_point[0] = params.arrayWidth / 2.0f;
+			params.principal_point[1] = params.arrayHeight / 2.0f;
+			//we use an arbitrary 'pixel size'
+			params.pixelSize_mm[0] = params.pixelSize_mm[1] = 1.0f / std::max(params.arrayWidth, params.arrayHeight);
+			params.vertFocal_pix = cam.f_pix * scaleFactor;
+			params.vFOV_rad = ccCameraSensor::ComputeFovRadFromFocalPix(cam.f_pix, params.arrayHeight);
 
 			//camera position/orientation
 			ccGLMatrix transf(cameras[i].trans.inverse().data());

@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -22,12 +22,8 @@
 #include <ScalarField.h>
 
 //qCC_db
-#include "qCC_db.h"
-#include "ccSerializableObject.h"
 #include "ccColorScale.h"
 
-//System
-#include <assert.h>
 
 //! A scalar field associated to display-related parameters
 /** Extends the CCLib::ScalarField object.
@@ -41,6 +37,12 @@ public:
 	**/
 	explicit ccScalarField(const char* name = 0);
 
+	//! Copy constructor
+	/** \param sf scalar field to copy
+		\warning May throw a std::bad_alloc exception
+	**/
+	ccScalarField(const ccScalarField& sf);
+
 	/*** Scalar values display handling ***/
 
 	//! Scalar field range structure
@@ -49,7 +51,9 @@ public:
 	public:
 
 		//! Default constructor
-		Range() : m_min(0), m_start(0), m_stop(0), m_max(0) {}
+		Range() : m_min(0), m_start(0), m_stop(0), m_max(0), m_range(1) {}
+		//! Copy constructor
+		Range(const Range& range) : m_min(range.m_min), m_start(range.m_start), m_stop(range.m_stop), m_max(range.m_max), m_range(range.m_range) {}
 
 		//getters
 		inline ScalarType min()			const { return m_min;		}
@@ -188,7 +192,10 @@ public:
 		unsigned maxValue;
 
 		//! Default constructor
-		Histogram() { maxValue = 0; }
+		Histogram() : maxValue(0) {}
+
+		//! Copy constructor
+		Histogram(const Histogram& h) : std::vector<unsigned>(h), maxValue(h.maxValue) {}
 	};
 
 	//! Returns associated histogram values (for display)
@@ -223,7 +230,7 @@ protected:
 	//! Default destructor
 	/** [SHAREABLE] Call 'release' to destroy this object properly.
 	**/
-	virtual ~ccScalarField() {};
+	virtual ~ccScalarField() {}
 
 	//! Updates saturation values
 	void updateSaturationBounds();

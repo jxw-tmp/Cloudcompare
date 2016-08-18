@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -24,8 +24,13 @@
 #include "AsciiOpenDlg.h"
 #include "AsciiSaveDlg.h"
 
-//Qt
-#include <QSharedPointer>
+template <class T> struct AutoDeletePtr
+{
+	AutoDeletePtr(T* _ptr = 0) : ptr(_ptr) {}
+	~AutoDeletePtr() { release(); }
+	inline void release() { if (ptr) { delete ptr; ptr = 0; } }
+	T* ptr;
+};
 
 //! ASCII point cloud I/O filter
 class QCC_IO_LIB_API AsciiFilter : public FileIOFilter
@@ -37,14 +42,14 @@ public:
 	static inline QString GetDefaultExtension() { return "asc"; }
 
 	//inherited from FileIOFilter
-	virtual bool importSupported() const { return true; }
-	virtual bool exportSupported() const { return true; }
-	virtual CC_FILE_ERROR loadFile(QString filename, ccHObject& container, LoadParameters& parameters);
-	virtual CC_FILE_ERROR saveToFile(ccHObject* entity, QString filename, SaveParameters& parameters);
-	virtual QStringList getFileFilters(bool onImport) const { return QStringList(GetFileFilter()); }
-	virtual QString getDefaultExtension() const { return GetDefaultExtension(); }
-	virtual bool canLoadExtension(QString upperCaseExt) const;
-	virtual bool canSave(CC_CLASS_ENUM type, bool& multiple, bool& exclusive) const;
+	virtual bool importSupported() const override { return true; }
+	virtual bool exportSupported() const override { return true; }
+	virtual CC_FILE_ERROR loadFile(QString filename, ccHObject& container, LoadParameters& parameters) override;
+	virtual CC_FILE_ERROR saveToFile(ccHObject* entity, QString filename, SaveParameters& parameters) override;
+	virtual QStringList getFileFilters(bool onImport) const override { return QStringList(GetFileFilter()); }
+	virtual QString getDefaultExtension() const override { return GetDefaultExtension(); }
+	virtual bool canLoadExtension(QString upperCaseExt) const override;
+	virtual bool canSave(CC_CLASS_ENUM type, bool& multiple, bool& exclusive) const override;
 
 	//! Loads an ASCII file with a predefined format
 	CC_FILE_ERROR loadCloudFromFormatedAsciiFile(	const QString& filename,
@@ -58,9 +63,9 @@ public:
 													LoadParameters& parameters);
 
 	//! Returns associated dialog (creates it if necessary)
-	static QSharedPointer<AsciiOpenDlg> GetOpenDialog();
+	static AsciiOpenDlg* GetOpenDialog(QWidget* parentWidget = 0);
 	//! Returns associated dialog (creates it if necessary)
-	static QSharedPointer<AsciiSaveDlg> GetSaveDialog();
+	static AsciiSaveDlg* GetSaveDialog(QWidget* parentWidget = 0);
 
 protected:
 
@@ -68,9 +73,9 @@ protected:
 	CC_FILE_ERROR saveFile(ccHObject* entity, FILE *theFile);
 
 	//! Associated (export) dialog
-	static QSharedPointer<AsciiSaveDlg> s_saveDialog;
+	static AutoDeletePtr<AsciiSaveDlg> s_saveDialog;
 	//! Associated (import) dialog
-	static QSharedPointer<AsciiOpenDlg> s_openDialog;
+	static AutoDeletePtr<AsciiOpenDlg> s_openDialog;
 };
 
 #endif //CC_ASCII_FILTER_HEADER

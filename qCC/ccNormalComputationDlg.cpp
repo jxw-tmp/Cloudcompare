@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -29,14 +29,12 @@
 #include <assert.h>
 
 ccNormalComputationDlg::ccNormalComputationDlg(SelectionMode selectionMode, QWidget* parent/*=0*/)
-	: QDialog(parent)
+	: QDialog(parent, Qt::Tool)
 	, Ui::NormalComputationDlg()
 	, m_cloud(0)
 	, m_selectionMode(selectionMode)
 {
 	setupUi(this);
-
-	setWindowFlags(Qt::Tool/*Qt::Dialog | Qt::WindowStaysOnTopHint*/);
 
 	//by default, the 'auto' button is hidden (as long as setCloud is not called)
 	autoRadiusToolButton->setVisible(false);
@@ -226,7 +224,7 @@ void ccNormalComputationDlg::autoEstimateRadius()
 
 	if (!m_cloud->getOctree())
 	{
-		ccProgressDialog pDlg(true,this);
+		ccProgressDialog pDlg(true, this);
 		if (!m_cloud->computeOctree(&pDlg))
 		{
 			ccLog::Error(QString("Could not compute octree for cloud '%1'").arg(m_cloud->getName()));
@@ -235,7 +233,7 @@ void ccNormalComputationDlg::autoEstimateRadius()
 		}
 	}
 
-	PointCoordinateType radius = ccNormalVectors::GuessBestRadius(m_cloud,m_cloud->getOctree());
+	PointCoordinateType radius = ccNormalVectors::GuessBestRadius(m_cloud, m_cloud->getOctree().data());
 	if (radius > 0)
 	{
 		radiusDoubleSpinBox->setValue(radius);

@@ -1,14 +1,14 @@
 //##########################################################################
 //#                                                                        #
-//#                            CLOUDCOMPARE                                #
+//#                              CLOUDCOMPARE                              #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
-//#  the Free Software Foundation; version 2 of the License.               #
+//#  the Free Software Foundation; version 2 or later of the License.      #
 //#                                                                        #
 //#  This program is distributed in the hope that it will be useful,       #
 //#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
+//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
 //#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
@@ -18,17 +18,23 @@
 #ifndef CC_PICK_ONE_ELEMENT_DLG_HEADER
 #define CC_PICK_ONE_ELEMENT_DLG_HEADER
 
-#include <ui_pickOneElementDlg.h>
+//Qt
+#include <QDialog>
+
+class Ui_PickOneElementDialog;
 
 //! Minimal dialog to pick one element in a list (combox box)
-class ccPickOneElementDlg : public QDialog, public Ui::PickOneElementDialog
+class ccPickOneElementDlg : public QDialog
 {
 public:
 
 	//! Default constructor
 	ccPickOneElementDlg(QString label,
-						QString windowTitle=QString(),
+						QString windowTitle = QString(),
 						QWidget* parent = 0);
+
+	//! Destructor
+	~ccPickOneElementDlg();
 
 	//! Add an element to the combo box
 	void addElement(QString elementName);
@@ -36,6 +42,11 @@ public:
 	void setDefaultIndex(int index);
 	//! Returns the combo box current index (after completion)
 	int getSelectedIndex();
+
+protected:
+
+	//! Associated UI
+	Ui_PickOneElementDialog* m_ui;
 };
 
 #endif //CC_PICK_ONE_ELEMENT_DLG_HEADER

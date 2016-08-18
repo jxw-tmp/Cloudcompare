@@ -58,7 +58,9 @@ public:
 	{
 		ScalarType chi = 0;
 		intptr_t size = end - begin;
+#ifdef DOPARALLEL
 		#pragma omp parallel for schedule(static) reduction(+:chi)
+#endif
 		for(intptr_t i = 0; i < size; ++i)
 		{
 			values[i] = 0;
@@ -75,7 +77,9 @@ public:
 		ScalarType *values, ScalarType *temp, ScalarType *matrix) const
 	{
 		intptr_t size = end - begin;
+#ifdef DOPARALLEL
 		#pragma omp parallel for schedule(static)
+#endif
 		for(intptr_t i = 0; i < size; ++i)
 		{
 			for(unsigned int j = 0; j < 3; ++j)
@@ -91,8 +95,10 @@ bool Cone::InitAverage(const MiscLib::Vector< Vec3f > &samples)
 	// setup all the planes
 	size_t c = samples.size() / 2;
 	MiscLib::Vector< GfxTL::Vector4Df > planes(c);
+#ifdef DOPARALLEL
 	#pragma omp parallel for schedule(static)
-	for(size_t i = 0; i < c; ++i)
+#endif
+	for (int i = 0; i < static_cast<int>(c); ++i)
 	{
 		for(unsigned int j = 0; j < 3; ++j)
 			planes[i][j] = samples[i][j];
@@ -129,8 +135,10 @@ bool Cone::InitAverage(const MiscLib::Vector< Vec3f > &samples)
 		(float *)m_center);
 
 	MiscLib::Vector< GfxTL::Vector3Df > spoints(c);
+#ifdef DOPARALLEL
 	#pragma omp parallel for schedule(static)
-	for(size_t i = 0; i < c; ++i)
+#endif
+	for (int i = 0; i < static_cast<int>(c); ++i)
 	{
 		spoints[i] = GfxTL::Vector3Df(samples[i] - m_center);
 		spoints[i].Normalize();
@@ -142,15 +150,19 @@ bool Cone::InitAverage(const MiscLib::Vector< Vec3f > &samples)
 	// make sure axis points in good direction
 	// the axis is defined to point into the interior of the cone
 	float heightSum = 0;
+#ifdef DOPARALLEL
 	#pragma omp parallel for schedule(static) reduction(+:heightSum)
-	for(size_t i = 0; i < c; ++i)
+#endif
+	for(int i = 0; i < static_cast<int>(c); ++i)
 		heightSum += Height(samples[i]);
 	if(heightSum < 0)
 		m_axisDir *= -1;
 
 	float angleReduction = 0;
+#ifdef DOPARALLEL
 	#pragma omp parallel for schedule(static) reduction(+:angleReduction)
-	for(size_t i = 0; i < c; ++i)
+#endif
+	for(int i = 0; i < static_cast<int>(c); ++i)
 	{
 		float angle = m_axisDir.dot(samples[i + c]);
 		if(angle < -1) // clamp angle to [-1, 1]
